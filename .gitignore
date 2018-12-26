@@ -1,0 +1,5 @@
+.directory
+**/*.sync-conflict*
+.Trash*
+cmake-build-*
+.idea
