@@ -1,63 +1,54 @@
 //
-// Created by john on 12/25/18.
+// Created by john on 12/26/18.
 //
-
-#include "zfs.h"
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-//#include <sys/stat.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <fcntl.h>
+#include "zfs.h"
 
-long fsize(int fd) {
-    // Reference: https://stackoverflow.com/a/8384
-//    struct stat st;
-//
-//    if (fstat(fd, &st) == 0) {
-//        return st.st_size;
-//    }
+// References:
+//  nvlist: github.com/zfsonlinux/zfs/blob/master/module/nvpair/fnvpair.c
+//  lzc:    github.com/zfsonlinux/zfs/blob/master/lib/libzfs_core/libzfs_core.c#L1229
 
-    FILE *fp = fdopen(fd, "r");
-    if (fp == NULL) {
-        return -1;
+ze_error run_channel_program(const char *zcp_file, const char *pool) {
+
+    ze_error ret = ZE_SUCCESS;
+
+    if(libzfs_core_init() != 0) {
+        libzfs_core_fini();
+        return ZE_FAILURE;
     }
 
-    fseek(fp, 0L, SEEK_END);
-    return ftell(fp);
-}
+    // Setup channel program
+    nvlist_t *outnvl;
+    nvlist_t *nvl = fnvlist_alloc();
+    nvlist_add_string(nvl, "pool", "zroot");
 
-int map_file(const char *file) {
+    dump_nvlist(nvl, 4);
 
-    char *buffer;
+    uint64_t instrlimit = 10 * 1000 * 1000; // 10 million is default
+    uint64_t memlimit = 10 * 1024 * 1024;   // 10MB is default
 
-    int fd = open(file, O_RDONLY);
-    if(fd < 0) {
-        return -1;
+    char *progstr = file_contents(zcp_file);
+
+    if (progstr) {
+#if defined(ZOL_VERSION) && ZOL_VERSION >= 8
+        int err = lzc_channel_program(pool, progstr, instrlimit, memlimit, nvl, &outnvl);
+        if (err != 0) {
+            fprintf(stderr, "Failed to run channel program");
+            ret = ZE_FAILURE;
+        } else {
+            dump_nvlist(outnvl, 4);
+        }
+#else
+#if defined(ZOL_VERSION)
+        fprintf(stderr, "Wrong ZFS version %d", ZOL_VERSION);
+#else
+        fprintf(stderr, "Can't run channel program");
+        ret = ZE_FAILURE;
+#endif
+#endif
     }
 
-    long file_size = fsize(fd);
-    if (file_size == -1) {
-        return -1;
-    }
-
-    // Map file
-
-    char *region = mmap(0L, (size_t) file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (region == MAP_FAILED) {
-        return -1;
-    }
-
-    printf("Contents of region: %s\n", region);
-
-    if (munmap(region, (size_t) file_size) != 0) {
-        return -1;
-    }
-
-    return 0;
-
+    libzfs_core_fini();
+    return ret;
 }

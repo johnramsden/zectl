@@ -9,15 +9,8 @@
  */
 
 #include <stdio.h>
-#include <libzfs_core.h>
 #include "zectl.h"
-#include <stdio.h>
-#include <stdlib.h>
 
-typedef enum ze_error {
-    ZE_SUCCESS,
-    ZE_FAILURE
-} ze_error;
 
 /* Function pointer to command */
 typedef ze_error (*command_func)(int argc, char **argv);
@@ -43,13 +36,16 @@ static void zectl_usage(void){
     puts("zectl unmount <boot environment>");
 }
 
-int run_channel_program() {
+ze_error list() {
     const char *f = "list.lua";
 
-    map_file(f);
+    run_channel_program(f, "zroot");
+
+    return ZE_SUCCESS;
 }
 
 int main() {
-    run_channel_program();
+    list();
+
     return 0;
 }
