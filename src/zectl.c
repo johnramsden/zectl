@@ -52,6 +52,8 @@ ze_list(int argc, char **argv){
     if (lzeh) {
         DEBUG_PRINT("ROOT: %s\n", lzeh->rootfs);
         DEBUG_PRINT("BE ROOT: %s\n", lzeh->be_root);
+        DEBUG_PRINT("BOOTFS: %s\n", lzeh->bootfs);
+        DEBUG_PRINT("ZPOOL: %s\n", lzeh->zpool);
     }
 
     zfs_run_channel_program(f, pool);

@@ -8,8 +8,12 @@
 #include <stdio.h>
 
 #if defined(DEBUG) && DEBUG > 0
-#define DEBUG_PRINT(fmt, args...) fprintf(stderr, "DEBUG: %s:%d:%s(): " fmt, \
-    __FILE__, __LINE__, __func__, ##args)
+#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define DEBUG_PRINT(fmt, args...) do { \
+    fprintf(stderr, "DEBUG: %s:%d:%s(): " \
+                    fmt, __FILENAME__, __LINE__, __func__, ##args); \
+    fprintf(stderr, "\n"); \
+    } while(0)
 #else
 #define DEBUG_PRINT(fmt, args...) /* Don't do anything in release builds */
 #endif

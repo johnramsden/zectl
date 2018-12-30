@@ -6,6 +6,7 @@
 #define ZECTL_ZE_H
 
 #include <libzfs/libzfs.h>
+
 #include "common.h"
 
 #define ZE_MAXPATHLEN    512
@@ -18,6 +19,7 @@ struct libze_handle {
     char be_root[ZE_MAXPATHLEN];
     char rootfs[ZE_MAXPATHLEN];
     char bootfs[ZE_MAXPATHLEN];
+    char zpool[ZE_MAXPATHLEN];
     ze_error_t error;
 };
 

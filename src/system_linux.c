@@ -12,7 +12,7 @@
 #include "util.h"
 
 system_linux_error
-system_linux_get_dataset(char *mountpoint, libze_handle_t *lzeh) {
+system_linux_get_dataset(char *mountpoint, char *dataset, size_t length) {
 
     struct mntent *ent = NULL;
     system_linux_error ret = SYSTEM_ERR_SUCCESS;
@@ -40,12 +40,10 @@ system_linux_get_dataset(char *mountpoint, libze_handle_t *lzeh) {
         goto fin;
     }
 
-    if (copy_string(lzeh->rootfs, ent->mnt_fsname, ZE_MAXPATHLEN) != 0) {
+    if (copy_string(dataset, ent->mnt_fsname, length) != 0) {
         ret = SYSTEM_ERR_UNKNOWN;
         goto fin;
     }
-
-
 
 fin:
     endmntent(mnt_file);
