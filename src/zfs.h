@@ -11,6 +11,6 @@
 #include "common.h"
 #include "util.h"
 
-ze_error run_channel_program(const char *zcp_file, const char *pool);
+ze_error_t zfs_run_channel_program(const char *zcp_file, const char *pool);
 
 #endif //ZECTL_ZFS_H

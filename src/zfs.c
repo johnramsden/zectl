@@ -9,13 +9,14 @@
 //  nvlist: github.com/zfsonlinux/zfs/blob/master/module/nvpair/fnvpair.c
 //  lzc:    github.com/zfsonlinux/zfs/blob/master/lib/libzfs_core/libzfs_core.c#L1229
 
-ze_error run_channel_program(const char *zcp_file, const char *pool) {
+ze_error_t
+zfs_run_channel_program(const char *zcp_file, const char *pool) {
 
-    ze_error ret = ZE_SUCCESS;
+    ze_error_t ret = ZE_ERROR_SUCCESS;
 
     if(libzfs_core_init() != 0) {
         libzfs_core_fini();
-        return ZE_FAILURE;
+        return ZE_ERROR_LIBZFS;
     }
 
     // Setup channel program
@@ -42,13 +43,13 @@ ze_error run_channel_program(const char *zcp_file, const char *pool) {
 #else
 #if defined(ZOL_VERSION)
         fprintf(stderr, "Wrong ZFS version %d", ZOL_VERSION);
-#else
-        fprintf(stderr, "Can't run channel program");
-        ret = ZE_FAILURE;
 #endif
+        fprintf(stderr, "Can't run channel program");
+        ret = ZE_ERROR_LIBZFS;
 #endif
     }
 
+    free(progstr);
     libzfs_core_fini();
     return ret;
 }

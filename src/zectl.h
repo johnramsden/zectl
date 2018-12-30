@@ -5,8 +5,6 @@
 #ifndef ZECTL_ZECTL_H
 #define ZECTL_ZECTL_H
 
-#include "../lib/util.h"
-#include "../lib/common.h"
-#include "../lib/zfs.h"
+
 
 #endif //ZECTL_ZECTL_H

@@ -3,6 +3,8 @@ project(zectl C)
 
 set(CMAKE_C_STANDARD 11)
 
+add_compile_definitions(DEBUG=1)
+
 # ZFS Version
 
 execute_process(COMMAND
@@ -31,10 +33,10 @@ endif()
 
 if(ZFS_INCLUDE_DIRS)
     message("Found zfs include directories in ${ZFS_INCLUDE_DIRS}")
-    include_directories(${ZFS_INCLUDE_DIRS})
+    include_directories(AFTER ${ZFS_INCLUDE_DIRS})
 elseif(ZFS_INCLUDE_DIR)
     message("Found zfs include directories in ${ZFS_INCLUDE_DIR}")
-    include_directories(${ZFS_INCLUDE_DIR})
+    include_directories(AFTER ${ZFS_INCLUDE_DIR})
 else()
     message(FATAL_ERROR "Failed to find ZFS include directories")
 endif()
@@ -111,9 +113,15 @@ endforeach()
 set(SOURCE_FILES
         src/zectl.c
         src/zectl.h
-        lib/util.c
-        lib/util.h
-        lib/common.h lib/zfs.c lib/zfs.h)
+        src/util.c
+        src/util.h
+        src/common.h
+        src/zfs.c
+        src/zfs.h
+        src/system_linux.c
+        src/system_linux.h
+        src/libze.c
+        src/libze.h)
 
 add_executable(zectl ${SOURCE_FILES})
 target_link_libraries(zectl ${ZE_LINK_LIBRARIES})
