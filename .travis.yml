@@ -1,0 +1,25 @@
+sudo: required
+dist: xenial
+os: linux
+
+language: c
+
+compiler:
+  - clang
+  - gcc
+
+addons:
+  apt:
+    sources:
+      - sourceline: 'ppa:zfs-native/stable'
+    packages:
+      - check
+
+before_install:
+  - sudo '.travis/ubuntu/setup_zfs_requirements.sh'
+
+script:
+  - sudo modprobe zfs
+  - mkdir -p CMakeModules-build && cd CMakeModules-build
+  - CMakeModules ..
+  - make
