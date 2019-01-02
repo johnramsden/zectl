@@ -11,10 +11,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "util.h"
-#include "common.h"
-#include "zfs.h"
-#include "system_linux.h"
+#include "zectl.h"
+#include "libze/libze.h"
+#include "util/util.h"
 
 /* Function pointer to command */
 typedef ze_error_t (*command_func)(libze_handle_t *lzeh, int argc, char **argv);
@@ -56,7 +55,7 @@ ze_list(libze_handle_t *lzeh, int argc, char **argv) {
         DEBUG_PRINT("BOOTFS: %s\n", lzeh->bootfs);
         DEBUG_PRINT("ZPOOL: %s\n", lzeh->zpool);
 
-        zfs_run_channel_program(f, lzeh->zpool);
+        libze_channel_program(lzeh, f);
     }
 
     return ret;

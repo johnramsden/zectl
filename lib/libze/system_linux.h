@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "libze.h"
+#include "libze/libze.h"
 
 typedef enum system_linux_error {
     SYSTEM_ERR_SUCCESS = 0,

@@ -1,9 +1,12 @@
 
 #include <string.h>
-#include "system_linux.h"
+#include <sys/nvpair.h>
+#include <libzfs_core.h>
 
-#include "libze.h"
-#include "util.h"
+#include "libze/libze.h"
+#include "util/util.h"
+
+#include "system_linux.h"
 
 /*
  * Given a complete name, return just the portion that refers to the parent.
@@ -146,3 +149,51 @@ err:
     return NULL;
 }
 
+// References:
+//  nvlist: github.com/zfsonlinux/zfs/blob/master/module/nvpair/fnvpair.c
+//  lzc:    github.com/zfsonlinux/zfs/blob/master/lib/libzfs_core/libzfs_core.c#L1229
+
+libze_error_t
+libze_channel_program(libze_handle_t *lzeh, const char *zcp_file) {
+
+    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+
+    if(libzfs_core_init() != 0) {
+        libzfs_core_fini();
+        return LIBZE_ERROR_LIBZFS;
+    }
+
+    // Setup channel program
+    nvlist_t *outnvl;
+    nvlist_t *nvl = fnvlist_alloc();
+    nvlist_add_string(nvl, "pool", "zroot");
+
+    dump_nvlist(nvl, 4);
+
+    uint64_t instrlimit = 10 * 1000 * 1000; // 10 million is default
+    uint64_t memlimit = 10 * 1024 * 1024;   // 10MB is default
+
+    char *progstr = file_contents(zcp_file);
+
+    if (progstr) {
+#if defined(ZOL_VERSION) && ZOL_VERSION >= 8
+        int err = lzc_channel_program(lzeh-z>pool, progstr, instrlimit, memlimit, nvl, &outnvl);
+        if (err != 0) {
+            fprintf(stderr, "Failed to run channel program");
+            ret = ZE_FAILURE;
+        } else {
+            dump_nvlist(outnvl, 4);
+        }
+#else
+#if defined(ZOL_VERSION)
+        DEBUG_PRINT("Wrong ZFS version %d", ZOL_VERSION);
+#endif
+        DEBUG_PRINT("Can't run channel program");
+        ret = LIBZE_ERROR_LIBZFS;
+#endif
+    }
+
+    free(progstr);
+    libzfs_core_fini();
+    return ret;
+}

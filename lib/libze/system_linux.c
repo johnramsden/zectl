@@ -9,7 +9,7 @@
 #include <mntent.h>
 
 #include "system_linux.h"
-#include "util.h"
+#include "util/util.h"
 
 system_linux_error
 system_linux_get_dataset(char *mountpoint, char *dataset, size_t length) {
