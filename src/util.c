@@ -10,16 +10,15 @@
 int
 copy_string(char *dst, const char *src, size_t size) {
     int ret = 0;
-//    char *ret = NULL;
-//    if (strlen(src) < size) {
-//        ret = strcpy(dst, src);
-//    }
-//    return ret;
-    int n = snprintf(dst, size, "%s", src);
-    if (n >= size) {
+    if (strlcpy(dst, src, size) == 0) {
         ret = -1;
     }
     return ret;
+//    int n = snprintf(dst, size, "%s", src);
+//    if (n >= size) {
+//        ret = -1;
+//    }
+//    return ret;
 }
 
 char *file_contents(const char *file) {

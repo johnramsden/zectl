@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 project(zectl C)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 add_compile_definitions(DEBUG=1)
 
@@ -106,7 +107,15 @@ foreach(zcp ${ZCP_SCRIPTS})
         file(COPY ${zcp} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
     endif()
 
+#    get_filename_component(FNAME ${zcp} NAME_WE)
+#
+#    execute_process(COMMAND
+#            sh -c "echo \"const char ${FNAME} = ;\"; while read l; do echo "$l}" done <${zcp}"
+#            OUTPUT_FILE "${FNAME}" OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 endforeach()
+
+
 
 # zectl Source ------------------------------------------------------------------
 

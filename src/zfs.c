@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include "zfs.h"
+#include "util.h"
 
 // References:
 //  nvlist: github.com/zfsonlinux/zfs/blob/master/module/nvpair/fnvpair.c
@@ -42,9 +43,9 @@ zfs_run_channel_program(const char *zcp_file, const char *pool) {
         }
 #else
 #if defined(ZOL_VERSION)
-        fprintf(stderr, "Wrong ZFS version %d", ZOL_VERSION);
+        DEBUG_PRINT("Wrong ZFS version %d", ZOL_VERSION);
 #endif
-        fprintf(stderr, "Can't run channel program");
+        DEBUG_PRINT("Can't run channel program");
         ret = ZE_ERROR_LIBZFS;
 #endif
     }

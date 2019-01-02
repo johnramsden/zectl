@@ -6,6 +6,8 @@
 #define ZECTL_UTIL_H
 
 #include <stdio.h>
+#include <string.h>
+#include <stdio.h>
 
 #if defined(DEBUG) && DEBUG > 0
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -50,5 +52,8 @@ destroy_property(prop_t *prop);
 
 prop_t *
 record_property(char *prop_name, char *prop_value);
+
+int
+get_hex_as_string();
 
 #endif //ZECTL_UTIL_H

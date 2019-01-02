@@ -1,8 +1,10 @@
 
 #include <string.h>
 #include "system_linux.h"
+
 #include "libze.h"
 #include "util.h"
+
 /*
  * Given a complete name, return just the portion that refers to the parent.
  * Will return -1 if there is no parent (path is just the name of the
@@ -16,11 +18,11 @@ parent_name(const char *path, char *buf, size_t buflen) {
         DEBUG_PRINT("Failed to copy string");
         return -1;
     }
-    DEBUG_PRINT("Getting parent of '%s'\n", buf);
+    DEBUG_PRINT("Getting parent of '%s'", buf);
 
     /* Get pointer to last instance of '/' */
     if (!(slashp = strrchr(buf, '/'))) {
-        DEBUG_PRINT("bez: Failed to terminate string at '/' for '%s'\n", buf);
+        DEBUG_PRINT("Failed to terminate string at '/' for '%s'", buf);
         return -1;
     }
 
@@ -53,6 +55,20 @@ get_root_dataset(libze_handle_t *lzeh) {
     zfs_close(zh);
 
     return 0;
+}
+
+void
+libze_fini(libze_handle_t *lzeh) {
+    DEBUG_PRINT("Closing libze handle");
+    if (lzeh) {
+        if (lzeh->lzh) {
+            libzfs_fini(lzeh->lzh);
+        }
+        if (lzeh->lzph) {
+            zpool_close(lzeh->lzph);
+        }
+        free(lzeh);
+    }
 }
 
 libze_handle_t *
@@ -99,7 +115,6 @@ libze_init() {
     if (copy_string(lzeh->zpool, zpool, ZE_MAXPATHLEN) != 0) {
         goto err;
     }
-    free(zpool);
 
     if (!(lzeh->lzph = zpool_open(lzeh->lzh, lzeh->zpool))) {
         goto err;
@@ -110,10 +125,12 @@ libze_init() {
         goto err;
     }
 
+    free(zpool);
     return lzeh;
 
     /* Error occurred */
 err:
+    DEBUG_PRINT("Error occurred");
     if (lzeh) {
         if (lzeh->lzh) {
             libzfs_fini(lzeh->lzh);
@@ -128,3 +145,4 @@ err:
     }
     return NULL;
 }
+

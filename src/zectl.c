@@ -17,7 +17,7 @@
 #include "system_linux.h"
 
 /* Function pointer to command */
-typedef ze_error_t (*command_func)(int argc, char **argv);
+typedef ze_error_t (*command_func)(libze_handle_t *lzeh, int argc, char **argv);
 
 /* Command name -> function map */
 typedef struct {
@@ -41,22 +41,23 @@ static void ze_usage(void){
 }
 
 /* TODO Implement */
-ze_error_t
-ze_list(int argc, char **argv){
+static ze_error_t
+ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     ze_error_t ret = ZE_ERROR_SUCCESS;
+
+    DEBUG_PRINT("Running list");
 
     const char *pool = "zroot"; // TODO: Get pool
     const char *f = "list.lua";
 
-    libze_handle_t *lzeh = libze_init();
     if (lzeh) {
         DEBUG_PRINT("ROOT: %s\n", lzeh->rootfs);
         DEBUG_PRINT("BE ROOT: %s\n", lzeh->be_root);
         DEBUG_PRINT("BOOTFS: %s\n", lzeh->bootfs);
         DEBUG_PRINT("ZPOOL: %s\n", lzeh->zpool);
-    }
 
-    zfs_run_channel_program(f, pool);
+        zfs_run_channel_program(f, lzeh->zpool);
+    }
 
     return ret;
 }
@@ -85,6 +86,10 @@ int main(int argc, char **argv) {
     int ze_argc = argc-1;
     char *ze_argv[ze_argc];
 
+    int ret = EXIT_SUCCESS;
+
+    libze_handle_t *lzeh = NULL;
+
     /* Set up all commands */
     command_map_t ze_command_map[NUM_COMMANDS] = {
             /* If commands are added or removed, must modify 'NUM_COMMANDS' */
@@ -102,18 +107,20 @@ int main(int argc, char **argv) {
 
     fputs("ZE: Boot Environment Manager for ZFS\n\n", stdout);
 
-//    if((boot_environment = ze_init()) == NULL) {
-//        fputs("bez: System may not be configured correctly for boot environments\n", stderr);
-//        exit(EXIT_FAILURE);
-//    }
+    if(!(lzeh = libze_init())) {
+        fputs("zectl: System may not be configured correctly for boot environments\n", stderr);
+        ret = EXIT_FAILURE;
+        goto fin;
+    }
 
     /* Check correct number of parameters were input */
     if(argc < 2){
-        fprintf(stderr, "\nbez: Invalid input, please enter a command.\n");
+        fprintf(stderr, "\nzectl: Invalid input, please enter a command.\n");
         ze_usage();
-        exit(EXIT_FAILURE);
+        ret = EXIT_FAILURE;
+        goto fin;
     } else {
-        /* Shift commandline arguments removing the program name 'bez'. */
+        /* Shift commandline arguments removing the program name. */
         for(int i = 0; i<ze_argc; i++) {
             ze_argv[i] = argv[i+1];
         }
@@ -123,16 +130,22 @@ int main(int argc, char **argv) {
     command_func ze_command = get_command(ze_command_map,
                                            NUM_COMMANDS, ze_argv[0]);
     // Run command if valid
-    if(ze_command != NULL) {
-        if(ze_command(ze_argc, ze_argv) != ZE_ERROR_SUCCESS){
-            fprintf(stderr, "bez: Failed to run 'bez %s'.\n", ze_argv[0]);
-            exit(EXIT_FAILURE);
-        }
-    } else {
-        fprintf(stderr, "\nbez: Invalid input, no match found.");
+    if(!ze_command) {
+        fprintf(stderr, "\nzectl: Invalid input, no match found.");
         ze_usage();
-        exit(EXIT_FAILURE);
+        ret = EXIT_FAILURE;
+        goto fin;
     }
 
-    return 0;
+    if(ze_command(lzeh, ze_argc, ze_argv) != ZE_ERROR_SUCCESS){
+        fprintf(stderr, "zectl: Failed to run 'zectl %s'.\n", ze_argv[0]);
+        ret = EXIT_FAILURE;
+        goto fin;
+    }
+
+fin:
+    if (lzeh) {
+        libze_fini(lzeh);
+    }
+    return ret;
 }
