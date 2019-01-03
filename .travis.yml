@@ -10,8 +10,6 @@ compiler:
 
 addons:
   apt:
-    sources:
-      - sourceline: 'ppa:zfs-native/stable'
     packages:
       - check
 
@@ -20,6 +18,7 @@ before_install:
 
 script:
   - sudo modprobe zfs
-  - mkdir -p CMakeModules-build && cd CMakeModules-build
-  - CMakeModules ..
+  - mkdir -p cmake-build && cd cmake-build
+  - cmake ..
   - make
+#  - ./tests/zectl_tests

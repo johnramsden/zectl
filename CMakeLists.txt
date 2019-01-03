@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.10)
 project(zectl C)
 
+enable_testing()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMakeModules/")
 
 include_directories(include)
 
 include(FindZFS)
+include(FindCheck)
 
 set(DATA_DIR data)
 set(ZCP_SCRIPTS
@@ -24,5 +27,5 @@ foreach(zcp ${ZCP_SCRIPTS})
 endforeach()
 
 add_subdirectory(src)
-#link_directories(lib/libze lib/util)
 add_subdirectory(lib)
+add_subdirectory(tests)
