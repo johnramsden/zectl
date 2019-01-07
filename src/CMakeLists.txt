@@ -1,18 +1,11 @@
-add_compile_definitions(DEBUG=1)
-
-# ZFS Version
-
 execute_process(COMMAND
-        sh -c "modinfo zfs | grep -iw version | awk '{print $2}' | cut -d '.' -f 2"
-        OUTPUT_VARIABLE ZOL_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-string(STRIP ${ZOL_VERSION} ZOL_VERSION)
-message(STATUS "ZOL_VERSION=${ZOL_VERSION}")
-add_compile_definitions(ZOL_VERSION=${ZOL_VERSION})
+        sh -c "${CMAKE_SOURCE_DIR}/scripts/file_to_header.sh ${CMAKE_SOURCE_DIR}/data/zcp"
+        OUTPUT_FILE ${CMAKE_SOURCE_DIR}/src/zcp.h)
 
 # zectl Source ------------------------------------------------------------------
 
 set(SOURCE_FILES
-        zectl.c zectl.h)
+        zectl.c zectl.h zcp.h)
 
 list(APPEND ZE_LINK_LIBRARIES libze util)
 

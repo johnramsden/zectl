@@ -10,9 +10,17 @@ include_directories(include)
 include(FindZFS)
 include(FindCheck)
 
+execute_process(COMMAND
+        sh -c "modinfo zfs | grep -iw version | awk '{print $2}' | cut -d '.' -f 2"
+        OUTPUT_VARIABLE ZOL_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(STRIP ${ZOL_VERSION} ZOL_VERSION)
+message(STATUS "ZOL_VERSION=${ZOL_VERSION}")
+
+add_compile_definitions(ZOL_VERSION=${ZOL_VERSION})
+add_compile_definitions(DEBUG=1)
 set(DATA_DIR data)
 set(ZCP_SCRIPTS
-        ${DATA_DIR}/zcp/list.lua
+        ${CMAKE_SOURCE_DIR}/${DATA_DIR}/zcp/list.lua
 )
 
 # LUA Scripts ------------------------------------------------------------------

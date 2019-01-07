@@ -31,6 +31,7 @@ libze_handle_t *libze_init();
 void libze_fini(libze_handle_t *);
 
 
-libze_error_t libze_channel_program(libze_handle_t *lzeh, const char *zcp_file);
+libze_error_t
+libze_channel_program(libze_handle_t *lzeh, const char *zcp_file, nvlist_t *nvl, nvlist_t **out_nvl);
 
 #endif //ZECTL_LIBZE_H

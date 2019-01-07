@@ -2,20 +2,19 @@
     See: https://illumos.org/man/1M/zfs-program
 --]]
 
-out = {}
+out = {};
 
-function ze_list(dataset)
-    for child in zfs.list.children(dataset) do
-        out[child] = child
+function ze_list(dataset, columns)
+    for _,column in pairs(columns) do
+        out[column] = zfs.get_prop(dataset, column);
     end
 end
 
-args = ...
-dataset = args["pool"]
+args = ... ;
 
-ze_list(dataset)
+ze_list(args["dataset"], args["columns"]);
 
-results = {}
-results["out"] = out
+results = {};
+results["out"] = out;
 
-return results
+return results;

@@ -44,19 +44,42 @@ static ze_error_t
 ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     ze_error_t ret = ZE_ERROR_SUCCESS;
 
+    boolean_t spaceused = B_FALSE;
+    boolean_t origin = B_FALSE;
+
     DEBUG_PRINT("Running list");
 
-    const char *pool = "zroot"; // TODO: Get pool
-    const char *f = "list.lua";
+    nvlist_t *nvl = fnvlist_alloc();
+    fnvlist_add_string(nvl, "dataset", lzeh->rootfs);
 
-    if (lzeh) {
-        DEBUG_PRINT("ROOT: %s\n", lzeh->rootfs);
-        DEBUG_PRINT("BE ROOT: %s\n", lzeh->be_root);
-        DEBUG_PRINT("BOOTFS: %s\n", lzeh->bootfs);
-        DEBUG_PRINT("ZPOOL: %s\n", lzeh->zpool);
+    nvlist_t *props_requested = fnvlist_alloc();
+    fnvlist_add_string(props_requested, "name", "name");
 
-        libze_channel_program(lzeh, f);
+    // TODO
+    if (spaceused) {
+        fnvlist_add_string(props_requested, "used", "used");
+        fnvlist_add_string(props_requested, "usedds", "usedds");
+        fnvlist_add_string(props_requested, "usedbysnapshots", "usedbysnapshots");
+        fnvlist_add_string(props_requested, "usedrefreserv", "usedrefreserv");
+        fnvlist_add_string(props_requested, "refer", "refer");
     }
+
+    if (origin) {
+        fnvlist_add_string(props_requested, "origin", "origin");
+    }
+
+    fnvlist_add_string(props_requested, "creation", "creation");
+    fnvlist_add_nvlist(nvl, "columns", props_requested);
+
+    nvlist_t *outnvl;
+    libze_channel_program(lzeh, zcp_list, nvl, &outnvl);
+
+    fflush(stderr);
+    fflush(stdout);
+//
+//    if (outnvl) {
+//        dump_nvlist(outnvl, 0);
+//    }
 
     return ret;
 }
