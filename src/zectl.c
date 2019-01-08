@@ -50,7 +50,7 @@ ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     DEBUG_PRINT("Running list");
 
     nvlist_t *nvl = fnvlist_alloc();
-    fnvlist_add_string(nvl, "dataset", lzeh->rootfs);
+    fnvlist_add_string(nvl, "beroot", lzeh->be_root);
 
     nvlist_t *props_requested = fnvlist_alloc();
     fnvlist_add_string(props_requested, "name", "name");
@@ -74,12 +74,17 @@ ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     nvlist_t *outnvl;
     libze_channel_program(lzeh, zcp_list, nvl, &outnvl);
 
-    fflush(stderr);
-    fflush(stdout);
-//
-//    if (outnvl) {
-//        dump_nvlist(outnvl, 0);
-//    }
+    nvpair_t *nvp;
+    nvlist_t *be_prop, *bootenvs;
+    if (nvlist_lookup_nvlist(outnvl, "bootenvs", &bootenvs) == 0) {
+        for (nvp = nvlist_next_nvpair(bootenvs, NULL); nvp != NULL;
+             nvp = nvlist_next_nvpair(bootenvs, nvp)) {
+            nvpair_value_nvlist(nvp, &be_prop);
+
+            dump_nvlist(be_prop, 0);
+
+        }
+    }
 
     return ret;
 }
