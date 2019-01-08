@@ -2,8 +2,6 @@
     See: https://illumos.org/man/1M/zfs-program
 --]]
 
-
-
 function ze_list(root, columns)
     local bootenvs = {};
     for child in zfs.list.children(root) do

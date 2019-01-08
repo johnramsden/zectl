@@ -39,13 +39,21 @@ static void ze_usage(void){
     puts("zectl unmount <boot environment>");
 }
 
+libze_error_t
+ze_get_props(libze_handle_t *lzeh, nvlist_t *props, nvlist_t **out_props) {
+    if (!props) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+    return libze_channel_program(lzeh, zcp_get_props, props, out_props);
+}
+
 /* TODO Implement */
 static ze_error_t
 ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     ze_error_t ret = ZE_ERROR_SUCCESS;
 
-    boolean_t spaceused = B_FALSE;
-    boolean_t origin = B_FALSE;
+    boolean_t spaceused = B_TRUE;
+    boolean_t origin = B_TRUE;
 
     DEBUG_PRINT("Running list");
 
@@ -58,10 +66,10 @@ ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     // TODO
     if (spaceused) {
         fnvlist_add_string(props_requested, "used", "used");
-        fnvlist_add_string(props_requested, "usedds", "usedds");
+//        fnvlist_add_string(props_requested, "usedds", "usedds");
         fnvlist_add_string(props_requested, "usedbysnapshots", "usedbysnapshots");
-        fnvlist_add_string(props_requested, "usedrefreserv", "usedrefreserv");
-        fnvlist_add_string(props_requested, "refer", "refer");
+//        fnvlist_add_string(props_requested, "usedrefreserv", "usedrefreserv");
+//        fnvlist_add_string(props_requested, "refer", "refer");
     }
 
     if (origin) {
@@ -72,7 +80,10 @@ ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     fnvlist_add_nvlist(nvl, "columns", props_requested);
 
     nvlist_t *outnvl;
-    libze_channel_program(lzeh, zcp_list, nvl, &outnvl);
+    if (libze_channel_program(lzeh, zcp_list, nvl, &outnvl) != LIBZE_ERROR_SUCCESS) {
+        return ZE_ERROR_UNKNOWN;
+    }
+    dump_nvlist(outnvl, 0);
 
     nvpair_t *nvp;
     nvlist_t *be_prop, *bootenvs;

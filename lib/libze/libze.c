@@ -171,7 +171,7 @@ libze_channel_program(libze_handle_t *lzeh, const char *zcp, nvlist_t *nvl, nvli
 #if defined(ZOL_VERSION) && ZOL_VERSION >= 8
     int err = lzc_channel_program(lzeh->zpool, zcp, instrlimit, memlimit, nvl, outnvl);
     if (err != 0) {
-        fprintf(stderr, "Failed to run channel program");
+        fprintf(stderr, "Failed to run channel program\n");
         ret = LIBZE_ERROR_LIBZFS;
     } else {
         DEBUG_PRINT("Dumping nvlist:");
