@@ -16,7 +16,4 @@ end
 
 args = ... ;
 
-out = {};
-out.bootenvs = ze_list(args.beroot, args.columns);
-
-return out;
+return ze_list(args.beroot, args.columns);
