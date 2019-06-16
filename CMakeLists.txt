@@ -17,7 +17,7 @@ string(STRIP ${ZOL_VERSION} ZOL_VERSION)
 message(STATUS "ZOL_VERSION=${ZOL_VERSION}")
 
 add_compile_definitions(ZOL_VERSION=${ZOL_VERSION})
-add_compile_definitions(DEBUG=1)
+add_compile_definitions(DEBUG=0)
 set(DATA_DIR data)
 set(ZCP_SCRIPTS
         ${CMAKE_SOURCE_DIR}/${DATA_DIR}/zcp/list.lua

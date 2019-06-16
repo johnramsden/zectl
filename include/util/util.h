@@ -37,23 +37,12 @@ struct node {
 
 
 int
-copy_string(char *dst, const char *src, size_t size);
-
-node_t *
-create_node(prop_t *property, node_t *next);
-
-node_t *
-prepend_node(prop_t *property, node_t *head);
-
-void
-destroy_list(node_t *head);
-void
-destroy_property(prop_t *prop);
-
-prop_t *
-record_property(char *prop_name, char *prop_value);
-
+form_property_string(const char namespace[static 1], const char property[static 1],
+                     size_t buflen, char buf[buflen]);
 int
-get_hex_as_string();
-
+form_dataset_string(const char root[static 1], const char boot_env[static 1],
+                    size_t buflen, char buf[buflen]);
+int
+form_snapshot_string(const char dataset[static 1], const char snap_name[static 1],
+                     size_t buflen, char buf[buflen]);
 #endif //ZECTL_UTIL_H

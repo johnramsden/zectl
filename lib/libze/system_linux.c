@@ -12,7 +12,7 @@
 #include "util/util.h"
 
 system_linux_error
-system_linux_get_dataset(char *mountpoint, char *dataset, size_t length) {
+system_linux_get_dataset(char mountpoint[static 1], char dataset[static 1], size_t length) {
 
     struct mntent *ent = NULL;
     system_linux_error ret = SYSTEM_ERR_SUCCESS;

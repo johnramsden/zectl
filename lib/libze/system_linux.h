@@ -21,7 +21,7 @@ typedef enum system_linux_error {
 } system_linux_error;
 
 system_linux_error
-system_linux_get_dataset(char *mountpoint, char *dataset, size_t length);
+system_linux_get_dataset(char mountpoint[static 1], char dataset[static 1], size_t length);
 
 
 #endif //ZE_SYSTEM_LINUX_H
