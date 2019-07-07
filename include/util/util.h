@@ -20,15 +20,19 @@
 #define DEBUG_PRINT(fmt, args...) /* Don't do anything in release builds */
 #endif
 
-char *file_contents(const char *file);
+char *
+file_contents(const char *file);
 
 int
 form_property_string(const char namespace[static 1], const char property[static 1],
                      size_t buflen, char buf[buflen]);
+
 int
 form_dataset_string(const char root[static 1], const char boot_env[static 1],
                     size_t buflen, char buf[buflen]);
+
 int
 form_snapshot_string(const char dataset[static 1], const char snap_name[static 1],
                      size_t buflen, char buf[buflen]);
+
 #endif //ZECTL_UTIL_H

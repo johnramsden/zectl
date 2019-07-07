@@ -18,7 +18,7 @@ typedef struct create_be_clone {
 } create_be_clone_t;
 
 static void
-gen_snap_suffix(size_t buflen, char buf[buflen]){
+gen_snap_suffix(size_t buflen, char buf[buflen]) {
     time_t now_time;
     time(&now_time);
     strftime(buf, buflen, "%F-%T", localtime(&now_time));
@@ -56,7 +56,7 @@ static ze_error_t
 pre_create_be_clone(libze_handle_t *lzeh, create_be_clone_t *create_clone) {
     // Check length before calling 'create_be_clone'
     // +2 for '@' and '\0'
-    if ((strlen(lzeh->bootfs) + strlen(create_clone->be_clone_snap_suffix) + 2) > ZFS_MAX_DATASET_NAME_LEN) {
+    if ((strlen(lzeh->bootfs)+strlen(create_clone->be_clone_snap_suffix)+2) > ZFS_MAX_DATASET_NAME_LEN) {
         fprintf(stderr, "%s%s%s%s", "Dataset name ", lzeh->bootfs, create_clone->be_clone_snap_suffix, " is too long");
         return ZE_ERROR_UNKNOWN;
     }
@@ -104,7 +104,7 @@ create_be_clone(libze_handle_t *lzeh, create_be_clone_t *create_clone) {
     }
 
     if (libze_clone(lzeh, source_ds, create_clone->be_clone_snap_suffix,
-            create_clone->be_ds_created) != LIBZE_ERROR_SUCCESS) {
+                    create_clone->be_ds_created) != LIBZE_ERROR_SUCCESS) {
 
     }
 
@@ -171,7 +171,7 @@ ze_create(libze_handle_t *lzeh, int argc, char **argv) {
     // Setup clone object
     gen_snap_suffix(ZFS_MAX_DATASET_NAME_LEN, be_clone.be_clone_snap_suffix);
     if (form_dataset_string(lzeh->be_root, be_name,
-            ZFS_MAX_DATASET_NAME_LEN, be_clone.be_ds_created) != 0) {
+                            ZFS_MAX_DATASET_NAME_LEN, be_clone.be_ds_created) != 0) {
         ret = ZE_ERROR_UNKNOWN;
         goto err;
     }

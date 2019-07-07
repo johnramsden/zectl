@@ -27,7 +27,8 @@ typedef struct {
 } command_map_t;
 
 /* Print zectl command usage */
-void ze_usage(void) {
+void
+ze_usage(void) {
     puts("\nUsage:");
     printf("%s activate <boot environment>\n", ZE_PROGRAM);
     printf("%s create <boot environment>\n", ZE_PROGRAM);
@@ -55,11 +56,11 @@ void ze_usage(void) {
  */
 static command_func
 get_command(command_map_t *ze_command_map,
-            int num_command_options, char input_name[static 1]){
+            int num_command_options, char input_name[static 1]) {
     command_func command = NULL;
 
     for (int i = 0; i < num_command_options; i++) {
-        if(strcmp(input_name,ze_command_map[i].name) == 0) {
+        if (strcmp(input_name, ze_command_map[i].name) == 0) {
             command = ze_command_map[i].command;
         }
     }
@@ -68,7 +69,8 @@ get_command(command_map_t *ze_command_map,
 
 #define NUM_COMMANDS 2 // Will be 9
 
-int main(int argc, char *argv[]) {
+int
+main(int argc, char *argv[]) {
 
     int ze_argc = argc-1;
     char *ze_argv[ze_argc];
@@ -84,7 +86,7 @@ int main(int argc, char *argv[]) {
             {"create", ze_create},
 //            {"destroy", ze_run_destroy},
 //            {"get", ze_run_get},
-            {"list", ze_list},
+            {"list",   ze_list},
 //            {"mount", ze_run_mount},
 //            {"rename", ze_run_rename},
 //            {"set", ze_run_set},
@@ -93,14 +95,14 @@ int main(int argc, char *argv[]) {
     };
 
     /* Check correct number of parameters were input */
-    if(argc < 2){
+    if (argc < 2) {
         fprintf(stderr, "\n%s: Invalid input, please enter a command.\n", ZE_PROGRAM);
         ze_usage();
         ret = EXIT_FAILURE;
         goto fin;
     } else {
         /* Shift commandline arguments removing the program name. */
-        for(int i = 0; i<ze_argc; i++) {
+        for (int i = 0; i < ze_argc; i++) {
             ze_argv[i] = argv[i+1];
         }
     }
@@ -112,7 +114,7 @@ int main(int argc, char *argv[]) {
 //        }
 //    }
 
-    if((lzeh = libze_init()) == NULL) {
+    if ((lzeh = libze_init()) == NULL) {
         printf("%s: System may not be configured correctly "
                "for boot environments\n", ZE_PROGRAM);
         ret = EXIT_FAILURE;
@@ -123,7 +125,7 @@ int main(int argc, char *argv[]) {
     command_func ze_command = get_command(ze_command_map,
                                           NUM_COMMANDS, ze_argv[0]);
     // Run command if valid
-    if(!ze_command) {
+    if (!ze_command) {
         fprintf(stderr, "\n%s: Invalid input, no match found.\n", ZE_PROGRAM);
         ze_usage();
         ret = EXIT_FAILURE;
@@ -131,7 +133,7 @@ int main(int argc, char *argv[]) {
     }
 
     ze_error_t ze_ret = ze_command(lzeh, ze_argc, ze_argv);
-    if(ze_ret != ZE_ERROR_SUCCESS){
+    if (ze_ret != ZE_ERROR_SUCCESS) {
         fprintf(stderr, "%s: Failed to run '%s %s'.\n", ZE_PROGRAM, ZE_PROGRAM, ze_argv[0]);
         ret = EXIT_FAILURE;
         goto fin;

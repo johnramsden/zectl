@@ -25,12 +25,12 @@ typedef struct list_options {
 
 static size_t
 number_length(long number) {
-    assert(number >= 0);
+            assert(number >= 0);
 
     size_t length = 1;
     long divided_num = number;
 
-    while ((divided_num = divided_num / 10) > 0) {
+    while ((divided_num = divided_num/10) > 0) {
         length++;
     }
 
@@ -107,11 +107,11 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
             nvpair_value_nvlist(pair, &be_props);
             compute_column_widths(be_props, options, &widths);
         }
-        widths.name+=HEADER_SPACING;
-        widths.active+=HEADER_SPACING;
-        widths.mountpoint+=HEADER_SPACING;
-        widths.spaceused+=HEADER_SPACING;
-        widths.creation+=HEADER_SPACING;
+        widths.name += HEADER_SPACING;
+        widths.active += HEADER_SPACING;
+        widths.mountpoint += HEADER_SPACING;
+        widths.spaceused += HEADER_SPACING;
+        widths.creation += HEADER_SPACING;
         printf("%-*s", (int)widths.name, HEADER_NAME);
         printf("%-*s", (int)widths.active, HEADER_ACTIVE);
         printf("%-*s", (int)widths.mountpoint, HEADER_MOUNTPOINT);
@@ -132,13 +132,13 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
         char active_buff[3] = "";
         boolean_t nextboot;
         if (nvlist_lookup_boolean_value(be_props, "nextboot", &nextboot) == 0) {
-            if(nextboot) {
+            if (nextboot) {
                 strcat(active_buff, "N");
             }
         }
         boolean_t active;
         if (nvlist_lookup_boolean_value(be_props, "active", &active) == 0) {
-            if(active) {
+            if (active) {
                 strcat(active_buff, "R");
             }
         }

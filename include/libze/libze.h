@@ -31,27 +31,32 @@ typedef struct libze_handle {
 typedef struct libze_clone_cbdata {
     nvlist_t **outnvl;
     libze_handle_t *lzeh;
-
 } libze_clone_cbdata_t;
 
-libze_handle_t *libze_init();
-void libze_fini(libze_handle_t *);
+libze_handle_t *
+libze_init();
 
+void
+libze_fini(libze_handle_t *);
 
 libze_error_t
 libze_list(libze_handle_t *lzeh, nvlist_t **outnvl);
+
 libze_error_t
 libze_channel_program(libze_handle_t *lzeh, const char *zcp_file, nvlist_t *nvl, nvlist_t **out_nvl);
+
 libze_error_t
 libze_clone(libze_handle_t *lzeh, char source_root[static 1], char source_snap_suffix[static 1], char be[static 1]);
 
 int
 boot_env_name(const char dataset[static 1], size_t buflen, char buf[buflen]);
+
 int
 boot_env_name_children(const char root[static 1], const char dataset[static 1], size_t buflen, char buf[buflen]);
 
 int
 libze_prop_prefix(const char path[static 1], size_t buflen, char buf[buflen]);
+
 libze_error_t
 libze_get_be_props(libze_handle_t *lzeh, nvlist_t **result, const char namespace[static 1]);
 

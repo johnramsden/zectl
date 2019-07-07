@@ -18,23 +18,24 @@ concat_with_separator(const char *prefix, const char *separator, const char *suf
 
 int
 form_property_string(const char namespace[static 1], const char property[static 1],
-        size_t buflen, char buf[buflen]) {
+                     size_t buflen, char buf[buflen]) {
     return concat_with_separator(namespace, ":", property, buflen, buf);
 }
 
 int
 form_dataset_string(const char root[static 1], const char boot_env[static 1],
-        size_t buflen, char buf[buflen]) {
+                    size_t buflen, char buf[buflen]) {
     return concat_with_separator(root, "/", boot_env, buflen, buf);
 }
 
 int
 form_snapshot_string(const char dataset[static 1], const char snap_name[static 1],
-        size_t buflen, char buf[buflen]) {
+                     size_t buflen, char buf[buflen]) {
     return concat_with_separator(dataset, "@", snap_name, buflen, buf);
 }
 
-char *file_contents(const char *file) {
+char *
+file_contents(const char *file) {
     char *buffer = NULL;
     FILE *fp = fopen(file, "rb");
 
@@ -42,14 +43,14 @@ char *file_contents(const char *file) {
         return NULL;
     }
 
-    fseek (fp, 0, SEEK_END);
-    size_t length = (size_t) ftell(fp);
-    fseek (fp, 0, SEEK_SET);
+    fseek(fp, 0, SEEK_END);
+    size_t length = (size_t)ftell(fp);
+    fseek(fp, 0, SEEK_SET);
     buffer = malloc(length);
     if (buffer != NULL) {
-        fread (buffer, 1, length, fp);
+        fread(buffer, 1, length, fp);
     }
-    fclose (fp);
+    fclose(fp);
 
     return buffer;
 }

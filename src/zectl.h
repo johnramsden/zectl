@@ -21,7 +21,8 @@ typedef enum ze_error {
     ZE_ERROR_EEXIST         /* Dataset/fs/snapshot exists */
 } ze_error_t;
 
-void ze_usage(void);
+void
+ze_usage(void);
 
 ze_error_t
 ze_list(libze_handle_t *lzeh, int argc, char **argv);

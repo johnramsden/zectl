@@ -12,7 +12,7 @@ static int
 cut_at_delimiter(const char path[static 1], size_t buflen, char buf[buflen], char delimiter) {
     char *slashp = NULL;
 
-    if(strlcpy(buf, path, buflen) >= buflen) {
+    if (strlcpy(buf, path, buflen) >= buflen) {
         return -1;
     }
 
@@ -40,6 +40,7 @@ int
 libze_prop_prefix(const char path[static 1], size_t buflen, char buf[buflen]) {
     return cut_at_delimiter(path, buflen, buf, ':');
 }
+
 /*
  * Given a complete name, return just the portion that refers to the be.
  * Will return -1 if there is no parent (path is just the name of the
@@ -49,7 +50,7 @@ int
 boot_env_name_children(const char root[static 1], const char dataset[static 1], size_t buflen, char buf[buflen]) {
 
 
-    if(strlcpy(buf, dataset, buflen) >= buflen) {
+    if (strlcpy(buf, dataset, buflen) >= buflen) {
         return -1;
     }
 
@@ -59,7 +60,7 @@ boot_env_name_children(const char root[static 1], const char dataset[static 1], 
     }
 
     /* get substring after last '/' */
-    if(strlcpy(buf, buf+loc, buflen) >= buflen) {
+    if (strlcpy(buf, buf+loc, buflen) >= buflen) {
         return -1;
     }
 
@@ -70,7 +71,7 @@ int
 boot_env_name(const char dataset[static 1], size_t buflen, char buf[buflen]) {
     char *slashp;
 
-    if(strlcpy(buf, dataset, buflen) >= buflen) {
+    if (strlcpy(buf, dataset, buflen) >= buflen) {
         return -1;
     }
 
@@ -80,7 +81,7 @@ boot_env_name(const char dataset[static 1], size_t buflen, char buf[buflen]) {
     }
 
     /* get substring after last '/' */
-    if(strlcpy(buf, slashp+1, buflen) >= buflen) {
+    if (strlcpy(buf, slashp+1, buflen) >= buflen) {
         return -1;
     }
 
@@ -150,8 +151,8 @@ libze_init() {
         goto err;
     }
 
-    pool_length = slashp - lzeh->be_root;
-    zpool = malloc(pool_length + 1);
+    pool_length = slashp-lzeh->be_root;
+    zpool = malloc(pool_length+1);
     if (zpool == NULL) {
         goto err;
     }
@@ -213,14 +214,14 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     nvlist_t *props = NULL;
     int is_mounted;
 
-    if(((props = fnvlist_alloc()) == NULL)) {
+    if (((props = fnvlist_alloc()) == NULL)) {
         ret = LIBZE_ERROR_NOMEM;
         goto err;
     }
 
     // Name
-    if(zfs_prop_get(zhdl, ZFS_PROP_NAME, dataset,
-                    sizeof(dataset), NULL, NULL, 0, 1) != 0) {
+    if (zfs_prop_get(zhdl, ZFS_PROP_NAME, dataset,
+                     sizeof(dataset), NULL, NULL, 0, 1) != 0) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
     }
@@ -235,15 +236,15 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
 
     // Mountpoint
     char mounted[ZE_MAXPATHLEN];
-    if(zfs_prop_get(zhdl, ZFS_PROP_MOUNTED, mounted,
-                    sizeof(mounted), NULL, NULL, 0, 1) != 0) {
+    if (zfs_prop_get(zhdl, ZFS_PROP_MOUNTED, mounted,
+                     sizeof(mounted), NULL, NULL, 0, 1) != 0) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
     }
 
-    if((is_mounted = strcmp(mounted, "yes")) == 0) {
-        if(zfs_prop_get(zhdl, ZFS_PROP_MOUNTPOINT, mountpoint,
-                        sizeof(mountpoint), NULL, NULL, 0, 1) != 0) {
+    if ((is_mounted = strcmp(mounted, "yes")) == 0) {
+        if (zfs_prop_get(zhdl, ZFS_PROP_MOUNTPOINT, mountpoint,
+                         sizeof(mountpoint), NULL, NULL, 0, 1) != 0) {
             ret = LIBZE_ERROR_UNKNOWN;
             goto err;
         }
@@ -251,8 +252,8 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     fnvlist_add_string(props, "mountpoint", (is_mounted == 0) ? mountpoint : "-");
 
     // Creation
-    if(zfs_prop_get(zhdl, ZFS_PROP_CREATION, prop_buffer,
-            sizeof(prop_buffer), NULL, NULL, 0, 1) != 0) {
+    if (zfs_prop_get(zhdl, ZFS_PROP_CREATION, prop_buffer,
+                     sizeof(prop_buffer), NULL, NULL, 0, 1) != 0) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
     }
@@ -278,7 +279,7 @@ libze_error_t
 libze_list(libze_handle_t *lzeh, nvlist_t **outnvl) {
     libze_error_t ret = LIBZE_ERROR_SUCCESS;
 
-    if((libzfs_core_init()) != 0) {
+    if ((libzfs_core_init()) != 0) {
         ret = LIBZE_ERROR_LIBZFS;
         goto err;
     }
@@ -291,7 +292,7 @@ libze_list(libze_handle_t *lzeh, nvlist_t **outnvl) {
     }
 
     // Out nvlist callback
-    if((*outnvl = fnvlist_alloc()) == NULL) {
+    if ((*outnvl = fnvlist_alloc()) == NULL) {
         ret = LIBZE_ERROR_NOMEM;
         goto err;
     }
@@ -338,7 +339,7 @@ clone_prop_cb(int prop, void *data) {
     }
 
     if (zfs_prop_get(pcbd->zhp, prop, propbuf, sizeof(propbuf), &src, statbuf,
-            sizeof(statbuf), B_FALSE) != 0) {
+                     sizeof(statbuf), B_FALSE) != 0) {
         return ZPROP_CONT;
     }
 
@@ -361,19 +362,19 @@ libze_clone_cb(zfs_handle_t *zhdl, void *data) {
     int ret = LIBZE_ERROR_SUCCESS;
     nvlist_t *props = NULL;
 
-    if(((props = fnvlist_alloc()) == NULL)) {
+    if (((props = fnvlist_alloc()) == NULL)) {
         return LIBZE_ERROR_NOMEM;
     }
 
     libze_clone_prop_cbdata_t cb_data = {
-        .lzeh = cbd->lzeh,
-        .props = props,
-        .zhp = zhdl
+            .lzeh = cbd->lzeh,
+            .props = props,
+            .zhp = zhdl
     };
 
     // Iterate over all props
     if (zprop_iter(clone_prop_cb, &cb_data,
-            B_FALSE, B_FALSE, ZFS_TYPE_FILESYSTEM) == ZPROP_INVAL) {
+                   B_FALSE, B_FALSE, ZFS_TYPE_FILESYSTEM) == ZPROP_INVAL) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
     }
@@ -391,7 +392,7 @@ libze_clone(libze_handle_t *lzeh, char source_root[static 1], char source_snap_s
     libze_error_t ret = LIBZE_ERROR_SUCCESS;
 
     nvlist_t *cdata = NULL;
-    if((cdata = fnvlist_alloc()) == NULL) {
+    if ((cdata = fnvlist_alloc()) == NULL) {
         return LIBZE_ERROR_NOMEM;
     }
 
@@ -466,13 +467,13 @@ libze_channel_program(libze_handle_t *lzeh, const char *zcp, nvlist_t *nvl, nvli
 
     libze_error_t ret = LIBZE_ERROR_SUCCESS;
 
-    if((libzfs_core_init()) != 0) {
+    if ((libzfs_core_init()) != 0) {
         ret = LIBZE_ERROR_LIBZFS;
         goto err;
     }
 
-    uint64_t instrlimit = 10 * 1000 * 1000; // 10 million is default
-    uint64_t memlimit = 10 * 1024 * 1024;   // 10MB is default
+    uint64_t instrlimit = 10*1000*1000; // 10 million is default
+    uint64_t memlimit = 10*1024*1024;   // 10MB is default
 
     DEBUG_PRINT("Running zcp: \n%s\n", zcp);
 
@@ -484,12 +485,12 @@ libze_channel_program(libze_handle_t *lzeh, const char *zcp, nvlist_t *nvl, nvli
         ret = LIBZE_ERROR_LIBZFS;
     }
 #else
-    #if defined(ZOL_VERSION)
-        DEBUG_PRINT("Wrong ZFS version %d", ZOL_VERSION);
-    #endif
+#if defined(ZOL_VERSION)
+    DEBUG_PRINT("Wrong ZFS version %d", ZOL_VERSION);
+#endif
 
-    DEBUG_PRINT("Can't run channel program");
-    ret = LIBZE_ERROR_LIBZFS;
+DEBUG_PRINT("Can't run channel program");
+ret = LIBZE_ERROR_LIBZFS;
 #endif
 
 err:
@@ -530,7 +531,7 @@ libze_get_be_props(libze_handle_t *lzeh, nvlist_t **result, const char namespace
         return LIBZE_ERROR_ZFS_OPEN;
     }
 
-    if((user_props = zfs_get_user_props(zhp)) == NULL) {
+    if ((user_props = zfs_get_user_props(zhp)) == NULL) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
     }
