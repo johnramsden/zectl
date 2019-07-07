@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(zectl C)
+set (CMAKE_C_STANDARD 11)
 
 enable_testing()
 
@@ -17,22 +18,23 @@ string(STRIP ${ZOL_VERSION} ZOL_VERSION)
 message(STATUS "ZOL_VERSION=${ZOL_VERSION}")
 
 add_compile_definitions(ZOL_VERSION=${ZOL_VERSION})
-add_compile_definitions(DEBUG=0)
+add_compile_definitions(DEBUG=1)
 set(DATA_DIR data)
-set(ZCP_SCRIPTS
-        ${CMAKE_SOURCE_DIR}/${DATA_DIR}/zcp/list.lua
-)
 
 # LUA Scripts ------------------------------------------------------------------
 
-foreach(zcp ${ZCP_SCRIPTS})
-
-    # copy zcps to build dir
-    if(${zcp} MATCHES "(lua)$")
-        file(COPY ${zcp} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-    endif()
-
-endforeach()
+#set(ZCP_SCRIPTS
+#        ${CMAKE_SOURCE_DIR}/${DATA_DIR}/zcp/list.lua
+#)
+#
+#foreach(zcp ${ZCP_SCRIPTS})
+#
+#    # copy zcps to build dir
+#    if(${zcp} MATCHES "(lua)$")
+#        file(COPY ${zcp} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+#    endif()
+#
+#endforeach()
 
 add_subdirectory(src)
 add_subdirectory(lib)
