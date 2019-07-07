@@ -40,7 +40,7 @@ system_linux_get_dataset(char mountpoint[static 1], char dataset[static 1], size
         goto fin;
     }
 
-    if (copy_string(dataset, ent->mnt_fsname, length) != 0) {
+    if (strlcpy(dataset, ent->mnt_fsname, length) >= length) {
         ret = SYSTEM_ERR_UNKNOWN;
         goto fin;
     }

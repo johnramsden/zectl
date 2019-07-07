@@ -7,24 +7,17 @@
 #include "util/util.h"
 #include "system_linux.h"
 
-/*
- * Given a complete name, return just the portion that refers to the parent.
- * Will return -1 if there is no parent (path is just the name of the
- * pool).
- */
+
 static int
 cut_at_delimiter(const char path[static 1], size_t buflen, char buf[buflen], char delimiter) {
     char *slashp = NULL;
 
-    if(copy_string(buf, path, buflen) != 0) {
-        DEBUG_PRINT("Failed to copy string");
+    if(strlcpy(buf, path, buflen) >= buflen) {
         return -1;
     }
-    DEBUG_PRINT("Getting parent of '%s'", buf);
 
     /* Get pointer to last instance of '/' */
-    if ((slashp = strrchr(buf, '/')) == NULL) {
-        DEBUG_PRINT("Failed to terminate string at '/' for '%s'", buf);
+    if ((slashp = strrchr(buf, delimiter)) == NULL) {
         return -1;
     }
 
@@ -32,6 +25,7 @@ cut_at_delimiter(const char path[static 1], size_t buflen, char buf[buflen], cha
     *slashp = '\0';
     return 0;
 }
+
 /*
  * Given a complete name, return just the portion that refers to the parent.
  * Will return -1 if there is no parent (path is just the name of the
@@ -76,21 +70,17 @@ int
 boot_env_name(const char dataset[static 1], size_t buflen, char buf[buflen]) {
     char *slashp;
 
-    if(copy_string(buf, dataset, buflen) != 0) {
-        DEBUG_PRINT("Failed to copy string");
+    if(strlcpy(buf, dataset, buflen) >= buflen) {
         return -1;
     }
-    DEBUG_PRINT("Getting parent of '%s'", buf);
 
     /* Get pointer to last instance of '/' */
     if ((slashp = strrchr(buf, '/')) == NULL) {
-        DEBUG_PRINT("Failed to terminate string at '/' for '%s'", buf);
         return -1;
     }
 
     /* get substring after last '/' */
-    if(copy_string(buf, slashp+1, buflen) != 0) {
-        DEBUG_PRINT("Failed to copy string");
+    if(strlcpy(buf, slashp+1, buflen) >= buflen) {
         return -1;
     }
 
@@ -100,7 +90,7 @@ boot_env_name(const char dataset[static 1], size_t buflen, char buf[buflen]) {
 static int
 get_root_dataset(libze_handle_t *lzeh) {
     zfs_handle_t *zh;
-    int ret;
+    int ret = 0;
 
     char rootfs[ZE_MAXPATHLEN];
 
@@ -113,7 +103,9 @@ get_root_dataset(libze_handle_t *lzeh) {
         return -1;
     }
 
-    ret = copy_string(lzeh->rootfs, zfs_get_name(zh), ZE_MAXPATHLEN);
+    if (strlcpy(lzeh->rootfs, zfs_get_name(zh), ZE_MAXPATHLEN) >= ZE_MAXPATHLEN) {
+        ret = -1;
+    }
 
     zfs_close(zh);
 
@@ -160,7 +152,7 @@ libze_init() {
 
     pool_length = slashp - lzeh->be_root;
     zpool = malloc(pool_length + 1);
-    if (!zpool) {
+    if (zpool == NULL) {
         goto err;
     }
 
@@ -171,7 +163,7 @@ libze_init() {
     zpool[pool_length] = '\0';
     DEBUG_PRINT("POOL: %s", zpool);
 
-    if (copy_string(lzeh->zpool, zpool, ZE_MAXPATHLEN) != 0) {
+    if (strlcpy(lzeh->zpool, zpool, ZE_MAXPATHLEN) >= ZE_MAXPATHLEN) {
         goto err;
     }
 

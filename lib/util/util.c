@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <libzfs.h>
 
 static int
 concat_with_separator(const char *prefix, const char *separator, const char *suffix,
@@ -11,7 +12,8 @@ concat_with_separator(const char *prefix, const char *separator, const char *suf
         (strlcat(buf, suffix, buflen) >= buflen)) {
         return -1;
     }
-    return ret;
+
+    return 0;
 }
 
 int

@@ -22,20 +22,6 @@
 
 char *file_contents(const char *file);
 
-typedef struct node node_t;
-typedef struct prop prop_t;
-
-struct prop {
-    char *name;
-    char *value;
-};
-
-struct node {
-    node_t *next;
-    prop_t *property;
-};
-
-
 int
 form_property_string(const char namespace[static 1], const char property[static 1],
                      size_t buflen, char buf[buflen]);

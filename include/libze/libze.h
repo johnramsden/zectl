@@ -26,7 +26,13 @@ typedef struct libze_handle {
     char bootfs[ZE_MAXPATHLEN];
     char zpool[ZE_MAXPATHLEN];
     libze_error_t error;
-};
+} libze_handle_t;
+
+typedef struct libze_clone_cbdata {
+    nvlist_t **outnvl;
+    libze_handle_t *lzeh;
+
+} libze_clone_cbdata_t;
 
 libze_handle_t *libze_init();
 void libze_fini(libze_handle_t *);
