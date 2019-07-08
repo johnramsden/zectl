@@ -4,94 +4,21 @@
 #include <errno.h>
 
 #include "libze/libze.h"
-#include "ze_util/ze_util.h"
+#include "libze_util/libze_util.h"
 #include "system_linux.h"
 
 // Unsigned long long is 64 bits or more
 #define ULL_SIZE 128
 
-/*
- * Given a complete name, return just the portion that refers to the parent.
- * Will return -1 if there is no parent (path is just the name of the
- * pool).
- */
-static int
-parent_name(const char path[static 1], size_t buflen, char buf[buflen]) {
-    return cut_at_delimiter(path, buflen, buf, '/');
-}
-
 int
-libze_prop_prefix(const char path[static 1], size_t buflen, char buf[buflen]) {
-    return cut_at_delimiter(path, buflen, buf, ':');
-}
-
-/*
- * Given a complete name, return just the portion that refers to the suffix.
- * Will return -1 if there is no parent (path is just the name of the
- * pool).
- */
-int
-suffix_after_string(const char root[static 1], const char dataset[static 1], size_t buflen, char buf[buflen]) {
-
-    if (strlcpy(buf, dataset, buflen) >= buflen) {
-        return -1;
-    }
-
-    size_t loc = strlen(root)+1;
-    if (loc >= buflen) {
-        return -1;
-    }
-
-    /* get substring after next '/' */
-    if (strlcpy(buf, buf+loc, buflen) >= buflen) {
-        return -1;
-    }
-
-    return 0;
-}
-
-int
-boot_env_name_children(const char root[static 1], const char dataset[static 1], size_t buflen, char buf[buflen]) {
-
-    if (suffix_after_string(root, dataset, buflen, buf) != 0) {
-        return -1;
-    }
-
-    DEBUG_PRINT("boot_env_name_children buf: %s", buf);
-
-    return 0;
-}
-
-int
-boot_env_name(const char dataset[static 1], size_t buflen, char buf[buflen]) {
-    char *slashp;
-
-    if (strlcpy(buf, dataset, buflen) >= buflen) {
-        return -1;
-    }
-
-    /* Get pointer to last instance of '/' */
-    if ((slashp = strrchr(buf, '/')) == NULL) {
-        return -1;
-    }
-
-    /* get substring after last '/' */
-    if (strlcpy(buf, slashp+1, buflen) >= buflen) {
-        return -1;
-    }
-
-    return 0;
-}
-
-static int
-get_root_dataset(libze_handle_t *lzeh) {
+libze_get_root_dataset(libze_handle_t *lzeh) {
     zfs_handle_t *zh;
     int ret = 0;
 
-    char rootfs[ZE_MAXPATHLEN];
+    char rootfs[LIBZE_MAXPATHLEN];
 
     // Make sure type is ZFS
-    if (system_linux_get_dataset("/", rootfs, ZE_MAXPATHLEN) != SYSTEM_ERR_SUCCESS) {
+    if (system_linux_get_dataset("/", rootfs, LIBZE_MAXPATHLEN) != SYSTEM_ERR_SUCCESS) {
         return -1;
     }
 
@@ -99,7 +26,7 @@ get_root_dataset(libze_handle_t *lzeh) {
         return -1;
     }
 
-    if (strlcpy(lzeh->rootfs, zfs_get_name(zh), ZE_MAXPATHLEN) >= ZE_MAXPATHLEN) {
+    if (strlcpy(lzeh->rootfs, zfs_get_name(zh), LIBZE_MAXPATHLEN) >= LIBZE_MAXPATHLEN) {
         ret = -1;
     }
 
@@ -137,10 +64,10 @@ libze_init(void) {
     if ((lzeh->lzh = libzfs_init()) == NULL) {
         goto err;
     }
-    if (get_root_dataset(lzeh) != 0) {
+    if (libze_get_root_dataset(lzeh) != 0) {
         goto err;
     }
-    if (parent_name(lzeh->rootfs, ZE_MAXPATHLEN, lzeh->be_root) != 0) {
+    if (libze_util_cut(lzeh->rootfs, LIBZE_MAXPATHLEN, lzeh->be_root, '/') != 0) {
         goto err;
     }
     if ((slashp = strchr(lzeh->be_root, '/')) == NULL) {
@@ -159,7 +86,7 @@ libze_init(void) {
     }
     zpool[pool_length] = '\0';
 
-    if (strlcpy(lzeh->zpool, zpool, ZE_MAXPATHLEN) >= ZE_MAXPATHLEN) {
+    if (strlcpy(lzeh->zpool, zpool, LIBZE_MAXPATHLEN) >= LIBZE_MAXPATHLEN) {
         goto err;
     }
 
@@ -189,10 +116,10 @@ typedef struct libze_list_cbdata {
 static int
 libze_list_cb(zfs_handle_t *zhdl, void *data) {
     libze_list_cbdata_t *cbd = data;
-    char prop_buffer[ZE_MAXPATHLEN];
-    char dataset[ZE_MAXPATHLEN];
-    char be_name[ZE_MAXPATHLEN];
-    char mountpoint[ZE_MAXPATHLEN];
+    char prop_buffer[LIBZE_MAXPATHLEN];
+    char dataset[LIBZE_MAXPATHLEN];
+    char be_name[LIBZE_MAXPATHLEN];
+    char mountpoint[LIBZE_MAXPATHLEN];
     int ret = LIBZE_ERROR_SUCCESS;
     nvlist_t *props = NULL;
 
@@ -210,14 +137,14 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     fnvlist_add_string(props, "dataset", dataset);
 
     // Boot env name
-    if (boot_env_name(dataset, ZE_MAXPATHLEN, be_name) != 0) {
+    if (libze_boot_env_name(dataset, LIBZE_MAXPATHLEN, be_name) != 0) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
     }
     fnvlist_add_string(props, "name", be_name);
 
     // Mountpoint
-    char mounted[ZE_MAXPATHLEN];
+    char mounted[LIBZE_MAXPATHLEN];
     if (zfs_prop_get(zhdl, ZFS_PROP_MOUNTED, mounted,
                      sizeof(mounted), NULL, NULL, 0, 1) != 0) {
         ret = LIBZE_ERROR_UNKNOWN;
@@ -241,14 +168,14 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
         goto err;
     }
 
-    char ull_buf[ULL_SIZE];
+    char t_buf[ULL_SIZE];
     unsigned long long int formatted_time = strtoull(prop_buffer, NULL, 10);
     // ISO 8601 date format
-    if (strftime(ull_buf, ULL_SIZE, "%F %H:%M", localtime((time_t *)&formatted_time)) == 0) {
+    if (strftime(t_buf, ULL_SIZE, "%F %H:%M", localtime((time_t *)&formatted_time)) == 0) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
     }
-    fnvlist_add_string(props, "creation", ull_buf);
+    fnvlist_add_string(props, "creation", t_buf);
 
     // Nextboot
     boolean_t is_nextboot = (strcmp(cbd->lzeh->bootfs, dataset) == 0);
@@ -325,8 +252,8 @@ clone_prop_cb(int prop, void *data) {
     libze_clone_prop_cbdata_t *pcbd = data;
 
     zprop_source_t src;
-    char propbuf[ZE_MAXPATHLEN];
-    char statbuf[ZE_MAXPATHLEN];
+    char propbuf[LIBZE_MAXPATHLEN];
+    char statbuf[LIBZE_MAXPATHLEN];
     const char *prop_name;
 
     // Skip if readonly or canmount
@@ -454,10 +381,10 @@ libze_clone(libze_handle_t *lzeh, char source_root[static 1], char source_snap_s
         char ds_snap_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
         char be_child_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
         char ds_child_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
-        if (boot_env_name_children(source_root, ds_name, ZFS_MAX_DATASET_NAME_LEN, be_child_buf) == 0) {
+        if (libze_util_suffix_after_string(source_root, ds_name, ZFS_MAX_DATASET_NAME_LEN, be_child_buf) == 0) {
             DEBUG_PRINT("BE child");
             if (strlen(be_child_buf) > 0) {
-                if (form_dataset_string(be, be_child_buf, ZFS_MAX_DATASET_NAME_LEN, ds_child_buf) != 0) {
+                if (libze_util_concat(be, be_child_buf, "/", ZFS_MAX_DATASET_NAME_LEN, ds_child_buf) != 0) {
                     ret = LIBZE_ERROR_UNKNOWN;
                     goto err;
                 }
@@ -470,8 +397,8 @@ libze_clone(libze_handle_t *lzeh, char source_root[static 1], char source_snap_s
             }
         }
 
-        form_snapshot_string(ds_name, source_snap_suffix,
-                             ZFS_MAX_DATASET_NAME_LEN, ds_snap_buf);
+        libze_util_concat(ds_name, "@", source_snap_suffix,
+                          ZFS_MAX_DATASET_NAME_LEN, ds_snap_buf);
         DEBUG_PRINT("Cloning %s from %s", ds_name, ds_snap_buf);
         DEBUG_PRINT("DS child: %s", ds_child_buf);
 
@@ -546,9 +473,9 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl, const cha
     for (pair = nvlist_next_nvpair(unfiltered_nvl, NULL); pair != NULL;
          pair = nvlist_next_nvpair(unfiltered_nvl, pair)) {
         char *nvp_name = nvpair_name(pair);
-        char buf[ZE_MAXPATHLEN];
+        char buf[LIBZE_MAXPATHLEN];
 
-        if (libze_prop_prefix(nvp_name, ZE_MAXPATHLEN, buf) != 0) {
+        if (libze_util_cut(nvp_name, LIBZE_MAXPATHLEN, buf, ':') != 0) {
             return LIBZE_ERROR_UNKNOWN;
         }
 

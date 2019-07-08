@@ -29,7 +29,6 @@
 
 set(SOURCE_FILES
         zectl.c zectl.h
-        #        zcp.c zcp.h
         zectl_list.c zectl_create.c)
 
 list(APPEND ZE_LINK_LIBRARIES libze util)

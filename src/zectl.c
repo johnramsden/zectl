@@ -12,13 +12,13 @@
 
 #include "zectl.h"
 #include "libze/libze.h"
-#include "ze_util/ze_util.h"
+#include "libze_util/libze_util.h"
 
 const char *ZE_PROGRAM = "zectl";
 const char *ZE_PROP_NAMESPACE = "org.zectl";
 
 /* Function pointer to command */
-typedef ze_error_t (*command_func)(libze_handle_t *lzeh, int argc, char **argv);
+typedef libze_error_t (*command_func)(libze_handle_t *lzeh, int argc, char **argv);
 
 /* Command name -> function map */
 typedef struct {
@@ -132,8 +132,8 @@ main(int argc, char *argv[]) {
         goto fin;
     }
 
-    ze_error_t ze_ret = ze_command(lzeh, ze_argc, ze_argv);
-    if (ze_ret != ZE_ERROR_SUCCESS) {
+    libze_error_t ze_ret = ze_command(lzeh, ze_argc, ze_argv);
+    if (ze_ret != LIBZE_ERROR_SUCCESS) {
         fprintf(stderr, "%s: Failed to run '%s %s'.\n", ZE_PROGRAM, ZE_PROGRAM, ze_argv[0]);
         ret = EXIT_FAILURE;
         goto fin;

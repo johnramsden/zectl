@@ -7,7 +7,7 @@
 
 #include <libzfs/libzfs.h>
 
-#define ZE_MAXPATHLEN    512
+#define LIBZE_MAXPATHLEN    512
 
 typedef enum libze_error {
     LIBZE_ERROR_SUCCESS = 0,
@@ -16,15 +16,16 @@ typedef enum libze_error {
     LIBZE_ERROR_UNKNOWN,
     LIBZE_ERROR_EPERM,
     LIBZE_ERROR_NOMEM,
+    LIBZE_ERROR_EEXIST         /* Dataset/fs/snapshot doesn't exist */
 } libze_error_t;
 
 typedef struct libze_handle {
     libzfs_handle_t *lzh;
     zpool_handle_t *lzph;
-    char be_root[ZE_MAXPATHLEN];
-    char rootfs[ZE_MAXPATHLEN];
-    char bootfs[ZE_MAXPATHLEN];
-    char zpool[ZE_MAXPATHLEN];
+    char be_root[LIBZE_MAXPATHLEN];
+    char rootfs[LIBZE_MAXPATHLEN];
+    char bootfs[LIBZE_MAXPATHLEN];
+    char zpool[LIBZE_MAXPATHLEN];
 } libze_handle_t;
 
 typedef struct libze_clone_cbdata {
@@ -53,15 +54,35 @@ libze_clone(libze_handle_t *lzeh, char source_root[static 1], char source_snap_s
             boolean_t recursive);
 
 int
-boot_env_name(const char dataset[static 1], size_t buflen, char buf[buflen]);
-
-int
-boot_env_name_children(const char root[static 1], const char dataset[static 1], size_t buflen, char buf[buflen]);
+libze_boot_env_name(const char *dataset, size_t buflen, char *buf);
 
 int
 libze_prop_prefix(const char path[static 1], size_t buflen, char buf[buflen]);
 
 libze_error_t
 libze_get_be_props(libze_handle_t *lzeh, nvlist_t **result, const char namespace[static 1]);
+
+
+
+/* Function pointer to command */
+typedef libze_error_t (*bootloader_func)(libze_handle_t *lzeh);
+
+/* Command name -> function map */
+typedef struct {
+    char *name;
+    bootloader_func command;
+} bootloader_map_t;
+
+typedef struct libze_bootloader {
+    nvlist_t *prop;
+    boolean_t set;
+} libze_bootloader_t;
+
+libze_error_t
+libze_bootloader_init(libze_handle_t *lzeh, libze_bootloader_t *bootloader, const char ze_namespace[static 1]);
+libze_error_t
+libze_bootloader_fini(libze_bootloader_t *bootloader);
+libze_error_t
+libze_bootloader_systemd_pre(libze_handle_t *lzeh);
 
 #endif //ZECTL_LIBZE_H

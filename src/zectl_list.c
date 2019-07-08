@@ -124,8 +124,8 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
         nvpair_value_nvlist(pair, &be_props);
 
         if (nvlist_lookup_string(be_props, "name", &string_prop) == 0) {
-            char buf[ZE_MAXPATHLEN];
-            boot_env_name(string_prop, ZE_MAXPATHLEN, buf);
+            char buf[ZFS_MAX_DATASET_NAME_LEN];
+            libze_boot_env_name(string_prop, ZFS_MAX_DATASET_NAME_LEN, buf);
             printf("%-*s%s", (int)widths.name, buf, tab_suffix);
         }
 
@@ -156,9 +156,9 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
     }
 }
 
-ze_error_t
+libze_error_t
 ze_list(libze_handle_t *lzeh, int argc, char **argv) {
-    ze_error_t ret = ZE_ERROR_SUCCESS;
+    libze_error_t ret = LIBZE_ERROR_SUCCESS;
     int opt;
     list_options_t options = {B_FALSE};
     nvlist_t *outnvl;
@@ -183,7 +183,7 @@ ze_list(libze_handle_t *lzeh, int argc, char **argv) {
             default:
                 fprintf(stderr, "%s list: unknown option '-%c'\n", ZE_PROGRAM, optopt);
                 ze_usage();
-                return ZE_ERROR_UNKNOWN;
+                return LIBZE_ERROR_UNKNOWN;
         }
     }
 

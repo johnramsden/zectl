@@ -1,2 +1,2 @@
 add_subdirectory(libze)
-add_subdirectory(util)
+add_subdirectory(libze_util)
