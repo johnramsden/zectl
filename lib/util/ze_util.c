@@ -1,4 +1,4 @@
-#include "util/util.h"
+#include "ze_util/ze_util.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +32,24 @@ int
 form_snapshot_string(const char dataset[static 1], const char snap_name[static 1],
                      size_t buflen, char buf[buflen]) {
     return concat_with_separator(dataset, "@", snap_name, buflen, buf);
+}
+
+int
+cut_at_delimiter(const char path[static 1], size_t buflen, char buf[buflen], char delimiter) {
+    char *slashp = NULL;
+
+    if (strlcpy(buf, path, buflen) >= buflen) {
+        return -1;
+    }
+
+    /* Get pointer to last instance of '/' */
+    if ((slashp = strrchr(buf, delimiter)) == NULL) {
+        return -1;
+    }
+
+    /* terminate string at '/' */
+    *slashp = '\0';
+    return 0;
 }
 
 char *

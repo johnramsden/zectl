@@ -77,35 +77,65 @@ pre_create_be_clone(libze_handle_t *lzeh, create_be_clone_t *create_clone) {
  */
 static ze_error_t
 create_be_clone(libze_handle_t *lzeh, create_be_clone_t *create_clone) {
-    char *snap = NULL;
+    char *be_clone_snap_suffix = NULL;
     char *source_ds = NULL;
+    boolean_t is_snap = B_FALSE;
     char buf[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char ds_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
     ze_error_t ret = ZE_ERROR_SUCCESS;
 
     // Verify validity of options
-    ze_error_t clone_ret = pre_create_be_clone(lzeh, create_clone);
-    if (clone_ret != ZE_ERROR_SUCCESS) {
-        return clone_ret;
+    if ((ret = pre_create_be_clone(lzeh, create_clone)) != ZE_ERROR_SUCCESS) {
+        return ret;
     }
 
-    if (!create_clone->options.existing) {
-        snap = buf;
-        source_ds = lzeh->bootfs;
-        if (form_snapshot_string(source_ds, create_clone->be_clone_snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap) != 0) {
-            return -1;
-        }
-        if (zfs_snapshot(lzeh->lzh, snap, create_clone->options.recursive, NULL) != 0) {
-            return -1;
+    if (create_clone->options.existing) {
+        // If snapshot
+        if (strchr(create_clone->be_clone_source, '@') != NULL) {
+            if (!zfs_dataset_exists(lzeh->lzh, create_clone->be_clone_source, ZFS_TYPE_SNAPSHOT)) {
+                fprintf(stderr, "%s%s%s\n", "Source snapshot: ", create_clone->be_clone_source, " doesn't exist.");
+                return ZE_ERROR_EEXIST;
+            }
+            // Get dataset
+            if (cut_at_delimiter(create_clone->be_clone_source, ZFS_MAX_DATASET_NAME_LEN, ds_buf, '@') != 0) {
+                return ZE_ERROR_UNKNOWN;
+            }
+            source_ds = ds_buf;
+            // Get snap suffix
+            if (suffix_after_string(ds_buf, create_clone->be_clone_source, ZFS_MAX_DATASET_NAME_LEN, buf) != 0) {
+                return ZE_ERROR_UNKNOWN;
+            }
+            be_clone_snap_suffix = buf;
+            is_snap = B_TRUE;
+        } else {
+            if (zfs_dataset_exists(lzeh->lzh, create_clone->be_clone_source, ZFS_TYPE_FILESYSTEM)) {
+                fprintf(stderr, "%s%s%s", "Source dataset: ", create_clone->be_clone_source, " doesn't exist.");
+                return ZE_ERROR_EEXIST;
+            }
+            source_ds = create_clone->be_clone_source;
         }
     } else {
-        // TODO: Existing
-        snap = create_clone->be_clone_source;
-        source_ds = create_clone->be_clone_source; // TODO: Fix if snap?
+        source_ds = lzeh->bootfs;
     }
 
-    if (libze_clone(lzeh, source_ds, create_clone->be_clone_snap_suffix,
-                    create_clone->be_ds_created) != LIBZE_ERROR_SUCCESS) {
+    if (!is_snap) {
+        source_ds = lzeh->bootfs;
+        if (form_snapshot_string(source_ds, create_clone->be_clone_snap_suffix, ZFS_MAX_DATASET_NAME_LEN, buf) != 0) {
+            return ZE_ERROR_UNKNOWN;
+        }
+        if (zfs_dataset_exists(lzeh->lzh, source_ds, ZFS_TYPE_SNAPSHOT)) {
+            fprintf(stderr, "%s%s%s", "Source snapshot: ", create_clone->be_clone_source, " doesn't exist.");
+            return ZE_ERROR_EEXIST;
+        }
+        if (zfs_snapshot(lzeh->lzh, buf, create_clone->options.recursive, NULL) != 0) {
+            return ZE_ERROR_UNKNOWN;
+        }
+        be_clone_snap_suffix = create_clone->be_clone_snap_suffix;
+    }
 
+    if (libze_clone(lzeh, source_ds, be_clone_snap_suffix,
+                    create_clone->be_ds_created, create_clone->options.recursive) != LIBZE_ERROR_SUCCESS) {
+        ret = ZE_ERROR_UNKNOWN;
     }
 
 
@@ -137,7 +167,7 @@ ze_create(libze_handle_t *lzeh, int argc, char **argv) {
 
     opterr = 0;
     int opt;
-    while ((opt = getopt(argc, argv, "er")) != -1) {
+    while ((opt = getopt(argc, argv, "e:r")) != -1) {
         switch (opt) {
             case 'e':
                 be_clone.be_clone_source = optarg;

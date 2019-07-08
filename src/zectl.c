@@ -12,7 +12,7 @@
 
 #include "zectl.h"
 #include "libze/libze.h"
-#include "util/util.h"
+#include "ze_util/ze_util.h"
 
 const char *ZE_PROGRAM = "zectl";
 const char *ZE_PROP_NAMESPACE = "org.zectl";

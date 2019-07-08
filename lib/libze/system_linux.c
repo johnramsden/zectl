@@ -9,7 +9,7 @@
 #include <mntent.h>
 
 #include "system_linux.h"
-#include "util/util.h"
+#include "ze_util/ze_util.h"
 
 system_linux_error
 system_linux_get_dataset(char mountpoint[static 1], char dataset[static 1], size_t length) {

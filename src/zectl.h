@@ -6,7 +6,7 @@
 #include <errno.h>
 
 #include "libze/libze.h"
-#include "util/util.h"
+#include "ze_util/ze_util.h"
 
 extern const char *ZE_PROGRAM;
 extern const char *ZE_PROP_NAMESPACE;

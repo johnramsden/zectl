@@ -2,8 +2,8 @@
 // Created by john on 12/25/18.
 //
 
-#ifndef ZECTL_UTIL_H
-#define ZECTL_UTIL_H
+#ifndef ZECTL_ZE_UTIL_H
+#define ZECTL_ZE_UTIL_H
 
 #include <stdio.h>
 #include <string.h>
@@ -35,4 +35,10 @@ int
 form_snapshot_string(const char dataset[static 1], const char snap_name[static 1],
                      size_t buflen, char buf[buflen]);
 
-#endif //ZECTL_UTIL_H
+int
+cut_at_delimiter(const char path[static 1], size_t buflen, char buf[buflen], char delimiter);
+
+int
+suffix_after_string(const char root[static 1], const char dataset[static 1], size_t buflen, char buf[buflen]);
+
+#endif //ZECTL_ZE_UTIL_H
