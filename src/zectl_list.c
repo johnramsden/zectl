@@ -161,7 +161,6 @@ ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     ze_error_t ret = ZE_ERROR_SUCCESS;
     int opt;
     list_options_t options = {B_FALSE};
-
     nvlist_t *outnvl;
 
     opterr = 0;
@@ -194,7 +193,8 @@ ze_list(libze_handle_t *lzeh, int argc, char **argv) {
     print_bes(&outnvl, &options);
 
 err:
-    nvlist_free(outnvl);
+
+    libze_list_free(outnvl);
 
     return ret;
 }

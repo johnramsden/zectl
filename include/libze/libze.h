@@ -34,13 +34,16 @@ typedef struct libze_clone_cbdata {
 } libze_clone_cbdata_t;
 
 libze_handle_t *
-libze_init();
+libze_init(void);
 
 void
 libze_fini(libze_handle_t *);
 
 libze_error_t
 libze_list(libze_handle_t *lzeh, nvlist_t **outnvl);
+
+void
+libze_list_free(nvlist_t *nvl);
 
 libze_error_t
 libze_channel_program(libze_handle_t *lzeh, const char *zcp_file, nvlist_t *nvl, nvlist_t **out_nvl);

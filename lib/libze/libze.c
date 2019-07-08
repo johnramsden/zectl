@@ -7,6 +7,8 @@
 #include "ze_util/ze_util.h"
 #include "system_linux.h"
 
+// Unsigned long long is 64 bits or more
+#define ULL_SIZE 128
 
 /*
  * Given a complete name, return just the portion that refers to the parent.
@@ -124,7 +126,7 @@ libze_fini(libze_handle_t *lzeh) {
  * @return Initialized handle, or NULL if unsuccessful.
  */
 libze_handle_t *
-libze_init() {
+libze_init(void) {
     libze_handle_t *lzeh = NULL;
     char *slashp = NULL;
     char *zpool = NULL;
@@ -238,7 +240,15 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
     }
-    fnvlist_add_string(props, "creation", prop_buffer);
+
+    char ull_buf[ULL_SIZE];
+    unsigned long long int formatted_time = strtoull(prop_buffer, NULL, 10);
+    // ISO 8601 date format
+    if (strftime(ull_buf, ULL_SIZE, "%F %H:%M", localtime((time_t *)&formatted_time)) == 0) {
+        ret = LIBZE_ERROR_UNKNOWN;
+        goto err;
+    }
+    fnvlist_add_string(props, "creation", ull_buf);
 
     // Nextboot
     boolean_t is_nextboot = (strcmp(cbd->lzeh->bootfs, dataset) == 0);
@@ -290,6 +300,19 @@ err:
     return ret;
 }
 
+void
+libze_list_free(nvlist_t *nvl) {
+    nvpair_t *pair = NULL;
+    // Free properties
+    for (pair = nvlist_next_nvpair(nvl, NULL); pair != NULL;
+         pair = nvlist_next_nvpair(nvl, pair)) {
+        nvlist_t *ds_props = NULL;
+        nvpair_value_nvlist(pair, &ds_props);
+        fnvlist_free(ds_props);
+    }
+
+    nvlist_free(nvl);
+}
 
 typedef struct libze_clone_prop_cbdata {
     libze_handle_t *lzeh;
