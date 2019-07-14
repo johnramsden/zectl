@@ -14,10 +14,10 @@ extern const char *ZE_PROP_NAMESPACE;
 void
 ze_usage(void);
 
-libze_error_t
-ze_list(libze_handle_t *lzeh, int argc, char **argv);
+libze_error
+ze_list(libze_handle *lzeh, int argc, char **argv);
 
-libze_error_t
-ze_create(libze_handle_t *lzeh, int argc, char **argv);
+libze_error
+ze_create(libze_handle *lzeh, int argc, char **argv);
 
 #endif //ZECTL_ZECTL_H

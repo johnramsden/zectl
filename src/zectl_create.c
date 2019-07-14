@@ -19,8 +19,8 @@ gen_snap_suffix(size_t buflen, char buf[buflen]) {
     strftime(buf, buflen, "%F-%T", localtime(&now_time));
 }
 
-static libze_error_t
-pre_create_be_clone(libze_handle_t *lzeh, create_be_clone_t *create_clone) {
+static libze_error
+pre_create_be_clone(libze_handle *lzeh, create_be_clone_t *create_clone) {
     // Check length before calling 'create_be_clone'
     // +2 for '@' and '\0'
     if ((strlen(lzeh->bootfs)+strlen(create_clone->be_clone_snap_suffix)+2) > ZFS_MAX_DATASET_NAME_LEN) {
@@ -42,14 +42,14 @@ pre_create_be_clone(libze_handle_t *lzeh, create_be_clone_t *create_clone) {
  * @pre Length of dataset created already checked
  * @return
  */
-static libze_error_t
-create_be_clone(libze_handle_t *lzeh, create_be_clone_t *create_clone) {
+static libze_error
+create_be_clone(libze_handle *lzeh, create_be_clone_t *create_clone) {
     char *be_clone_snap_suffix = NULL;
     char *source_ds = NULL;
     boolean_t is_snap = B_FALSE;
     char buf[ZFS_MAX_DATASET_NAME_LEN] = "";
     char ds_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
-    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
     // Verify validity of options
     if ((ret = pre_create_be_clone(lzeh, create_clone)) != LIBZE_ERROR_SUCCESS) {
@@ -117,10 +117,10 @@ err:
  * @param argv As passed to main, contains boot env to create
  * @return LIBZE_ERROR_SUCCESS upon success
  */
-libze_error_t
-ze_create(libze_handle_t *lzeh, int argc, char **argv) {
+libze_error
+ze_create(libze_handle *lzeh, int argc, char **argv) {
 
-    libze_bootloader_t bootloader;
+    libze_bootloader bootloader;
 
     create_be_clone_t be_clone = {
             .be_clone_source = NULL,
@@ -129,7 +129,7 @@ ze_create(libze_handle_t *lzeh, int argc, char **argv) {
             .options = {B_FALSE}
     };
 
-    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
     bootloader.set = B_FALSE;
 
     opterr = 0;

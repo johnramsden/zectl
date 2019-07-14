@@ -18,7 +18,7 @@ const char *ZE_PROGRAM = "zectl";
 const char *ZE_PROP_NAMESPACE = "org.zectl";
 
 /* Function pointer to command */
-typedef libze_error_t (*command_func)(libze_handle_t *lzeh, int argc, char **argv);
+typedef libze_error (*command_func)(libze_handle *lzeh, int argc, char **argv);
 
 /* Command name -> function map */
 typedef struct {
@@ -42,8 +42,8 @@ ze_usage(void) {
     printf("%s unmount <boot environment>\n", ZE_PROGRAM);
 }
 
-//libze_error_t
-//ze_get_props(libze_handle_t *lzeh, nvlist_t *props, nvlist_t **out_props) {
+//libze_error
+//ze_get_props(libze_handle *lzeh, nvlist_t *props, nvlist_t **out_props) {
 //    if (!props) {
 //        return LIBZE_ERROR_UNKNOWN;
 //    }
@@ -77,7 +77,7 @@ main(int argc, char *argv[]) {
 
     int ret = EXIT_SUCCESS;
 
-    libze_handle_t *lzeh = NULL;
+    libze_handle *lzeh = NULL;
 
     /* Set up all commands */
     command_map_t ze_command_map[NUM_COMMANDS] = {
@@ -132,7 +132,7 @@ main(int argc, char *argv[]) {
         goto fin;
     }
 
-    libze_error_t ze_ret = ze_command(lzeh, ze_argc, ze_argv);
+    libze_error ze_ret = ze_command(lzeh, ze_argc, ze_argv);
     if (ze_ret != LIBZE_ERROR_SUCCESS) {
         fprintf(stderr, "%s: Failed to run '%s %s'.\n", ZE_PROGRAM, ZE_PROGRAM, ze_argv[0]);
         ret = EXIT_FAILURE;

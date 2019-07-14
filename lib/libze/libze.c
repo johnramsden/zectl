@@ -11,7 +11,7 @@
 #define ULL_SIZE 128
 
 int
-libze_get_root_dataset(libze_handle_t *lzeh) {
+libze_get_root_dataset(libze_handle *lzeh) {
     zfs_handle_t *zh;
     int ret = 0;
 
@@ -36,7 +36,7 @@ libze_get_root_dataset(libze_handle_t *lzeh) {
 }
 
 void
-libze_fini(libze_handle_t *lzeh) {
+libze_fini(libze_handle *lzeh) {
     if (lzeh != NULL) {
         if (lzeh->lzh != NULL) {
             libzfs_fini(lzeh->lzh);
@@ -52,13 +52,13 @@ libze_fini(libze_handle_t *lzeh) {
  * @brief Initialize libze handle.
  * @return Initialized handle, or NULL if unsuccessful.
  */
-libze_handle_t *
+libze_handle *
 libze_init(void) {
-    libze_handle_t *lzeh = NULL;
+    libze_handle *lzeh = NULL;
     char *slashp = NULL;
     char *zpool = NULL;
 
-    if ((lzeh = calloc(1, sizeof(libze_handle_t))) == NULL) {
+    if ((lzeh = calloc(1, sizeof(libze_handle))) == NULL) {
         goto err;
     }
     if ((lzeh->lzh = libzfs_init()) == NULL) {
@@ -110,7 +110,7 @@ err:
 
 typedef struct libze_list_cbdata {
     nvlist_t **outnvl;
-    libze_handle_t *lzeh;
+    libze_handle *lzeh;
 } libze_list_cbdata_t;
 
 static int
@@ -193,9 +193,9 @@ err:
     return ret;
 }
 
-libze_error_t
-libze_list(libze_handle_t *lzeh, nvlist_t **outnvl) {
-    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+libze_error
+libze_list(libze_handle *lzeh, nvlist_t **outnvl) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
     if ((libzfs_core_init()) != 0) {
         ret = LIBZE_ERROR_LIBZFS;
@@ -227,10 +227,9 @@ err:
     return ret;
 }
 
-void
-libze_list_free(nvlist_t *nvl) {
+static void
+libze_free_children_nvl(nvlist_t *nvl) {
     nvpair_t *pair = NULL;
-    // Free properties
     for (pair = nvlist_next_nvpair(nvl, NULL); pair != NULL;
          pair = nvlist_next_nvpair(nvl, pair)) {
         nvlist_t *ds_props = NULL;
@@ -241,8 +240,13 @@ libze_list_free(nvlist_t *nvl) {
     nvlist_free(nvl);
 }
 
+void
+libze_list_free(nvlist_t *nvl) {
+    libze_free_children_nvl(nvl);
+}
+
 typedef struct libze_clone_prop_cbdata {
-    libze_handle_t *lzeh;
+    libze_handle *lzeh;
     zfs_handle_t *zhp;
     nvlist_t *props;
 } libze_clone_prop_cbdata_t;
@@ -288,7 +292,7 @@ clone_prop_cb(int prop, void *data) {
 
 static int
 libze_clone_cb(zfs_handle_t *zhdl, void *data) {
-    libze_clone_cbdata_t *cbd = data;
+    libze_clone_cbdata *cbd = data;
     int ret = LIBZE_ERROR_SUCCESS;
     nvlist_t *props = NULL;
 
@@ -334,10 +338,10 @@ err:
  * @param recursive Do recursive clone
  * @return
  */
-libze_error_t
-libze_clone(libze_handle_t *lzeh, char source_root[static 1], char source_snap_suffix[static 1], char be[static 1],
+libze_error
+libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suffix[static 1], char be[static 1],
             boolean_t recursive) {
-    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
     nvlist_t *cdata = NULL;
     if ((cdata = fnvlist_alloc()) == NULL) {
@@ -351,7 +355,7 @@ libze_clone(libze_handle_t *lzeh, char source_root[static 1], char source_snap_s
         goto err;
     }
 
-    libze_clone_cbdata_t cbd = {
+    libze_clone_cbdata cbd = {
             .outnvl = &cdata,
             .lzeh = lzeh,
             .recursive = recursive
@@ -419,20 +423,24 @@ libze_clone(libze_handle_t *lzeh, char source_root[static 1], char source_snap_s
     }
 
 err:
-    // TODO: Free children nvlists?
-    fnvlist_free(cdata);
+    libze_free_children_nvl(cdata);
     zfs_close(zroot_hdl);
     return ret;
+}
+
+libze_error
+libze_activate(libze_handle *lzeh, libze_activate_options *options) {
+
 }
 
 // References:
 //  nvlist: github.com/zfsonlinux/zfs/blob/master/module/nvpair/fnvpair.c
 //  lzc:    github.com/zfsonlinux/zfs/blob/master/lib/libzfs_core/libzfs_core.c#L1229
 
-libze_error_t
-libze_channel_program(libze_handle_t *lzeh, const char *zcp, nvlist_t *nvl, nvlist_t **outnvl) {
+libze_error
+libze_channel_program(libze_handle *lzeh, const char *zcp, nvlist_t *nvl, nvlist_t **outnvl) {
 
-    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
     if ((libzfs_core_init()) != 0) {
         ret = LIBZE_ERROR_LIBZFS;
@@ -465,10 +473,10 @@ err:
     return ret;
 }
 
-static libze_error_t
+static libze_error
 libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl, const char namespace[static 1]) {
     nvpair_t *pair;
-    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
     for (pair = nvlist_next_nvpair(unfiltered_nvl, NULL); pair != NULL;
          pair = nvlist_next_nvpair(unfiltered_nvl, pair)) {
@@ -487,11 +495,11 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl, const cha
     return ret;
 }
 
-libze_error_t
-libze_get_be_props(libze_handle_t *lzeh, nvlist_t **result, const char namespace[static 1]) {
+libze_error
+libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]) {
     nvlist_t *user_props = NULL;
     nvlist_t *filtered_user_props = NULL;
-    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
     zfs_handle_t *zhp = zfs_open(lzeh->lzh, lzeh->be_root, ZFS_TYPE_FILESYSTEM);
 
     if (zhp == NULL) {

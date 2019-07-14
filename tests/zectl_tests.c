@@ -10,7 +10,7 @@
 
 START_TEST (test_libze_init)
     {
-        libze_handle_t *lzeh = NULL;
+        libze_handle *lzeh = NULL;
         lzeh = libze_init();
 
         fail_if(!lzeh, "lzeh null after allocation");

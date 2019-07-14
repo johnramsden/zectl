@@ -156,9 +156,9 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
     }
 }
 
-libze_error_t
-ze_list(libze_handle_t *lzeh, int argc, char **argv) {
-    libze_error_t ret = LIBZE_ERROR_SUCCESS;
+libze_error
+ze_list(libze_handle *lzeh, int argc, char **argv) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
     int opt;
     list_options_t options = {B_FALSE};
     nvlist_t *outnvl;
