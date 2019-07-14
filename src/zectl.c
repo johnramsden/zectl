@@ -67,7 +67,7 @@ get_command(command_map_t *ze_command_map,
     return command;
 }
 
-#define NUM_COMMANDS 2 // Will be 9
+#define NUM_COMMANDS 3 // Will be 9
 
 int
 main(int argc, char *argv[]) {
@@ -82,7 +82,7 @@ main(int argc, char *argv[]) {
     /* Set up all commands */
     command_map_t ze_command_map[NUM_COMMANDS] = {
             /* If commands are added or removed, must modify 'NUM_COMMANDS' */
-//            {"activate", ze_run_activate},
+            {"activate", ze_activate},
             {"create", ze_create},
 //            {"destroy", ze_run_destroy},
 //            {"get", ze_run_get},

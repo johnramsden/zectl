@@ -76,6 +76,14 @@ typedef struct libze_bootloader {
     boolean_t set;
 } libze_bootloader;
 
+typedef struct libze_activate_options {
+    char *be_name;
+    boolean_t noconfirm;
+} libze_activate_options;
+
+libze_error
+libze_activate(libze_handle *lzeh, libze_activate_options *options);
+
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]);
 libze_error

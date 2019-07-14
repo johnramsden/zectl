@@ -29,7 +29,7 @@
 
 set(SOURCE_FILES
         zectl.c zectl.h
-        zectl_list.c zectl_create.c)
+        zectl_list.c zectl_create.c zectl_activate.c)
 
 list(APPEND ZE_LINK_LIBRARIES libze util)
 
