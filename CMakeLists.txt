@@ -19,6 +19,7 @@ message(STATUS "ZOL_VERSION=${ZOL_VERSION}")
 
 add_compile_definitions(ZOL_VERSION=${ZOL_VERSION})
 add_compile_definitions(DEBUG=1)
+
 set(DATA_DIR data)
 
 # LUA Scripts ------------------------------------------------------------------

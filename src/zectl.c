@@ -12,10 +12,9 @@
 
 #include "zectl.h"
 #include "libze/libze.h"
-#include "libze_util/libze_util.h"
+#include "libze/libze_util.h"
 
 const char *ZE_PROGRAM = "zectl";
-const char *ZE_PROP_NAMESPACE = "org.zectl";
 
 /* Function pointer to command */
 typedef libze_error (*command_func)(libze_handle *lzeh, int argc, char **argv);

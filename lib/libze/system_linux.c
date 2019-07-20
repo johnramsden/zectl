@@ -9,7 +9,7 @@
 #include <mntent.h>
 
 #include "system_linux.h"
-#include "libze_util/libze_util.h"
+#include "libze/libze_util.h"
 
 system_linux_error
 system_linux_get_dataset(char mountpoint[static 1], char dataset[static 1], size_t length) {

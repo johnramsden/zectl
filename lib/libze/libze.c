@@ -1,14 +1,19 @@
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <sys/nvpair.h>
 #include <libzfs_core.h>
 #include <errno.h>
+#include <libze/libze_plugin_manager.h>
 
 #include "libze/libze.h"
-#include "libze_util/libze_util.h"
+#include "libze/libze_util.h"
 #include "system_linux.h"
 
 // Unsigned long long is 64 bits or more
 #define ULL_SIZE 128
+
+const char *ZE_PROP_NAMESPACE = "org.zectl";
 
 int
 libze_get_root_dataset(libze_handle *lzeh) {
@@ -37,15 +42,54 @@ libze_get_root_dataset(libze_handle *lzeh) {
 
 void
 libze_fini(libze_handle *lzeh) {
-    if (lzeh != NULL) {
-        if (lzeh->lzh != NULL) {
-            libzfs_fini(lzeh->lzh);
-        }
-        if (lzeh->lzph != NULL) {
-            zpool_close(lzeh->lzph);
-        }
-        free(lzeh);
+    if (lzeh == NULL) {
+        return;
     }
+
+    if (lzeh->lzh != NULL) {
+        libzfs_fini(lzeh->lzh);
+    }
+    if (lzeh->lzph != NULL) {
+        zpool_close(lzeh->lzph);
+    }
+
+    if (lzeh->ze_props != NULL) {
+        fnvlist_free(lzeh->ze_props);
+    }
+
+    free(lzeh);
+}
+
+static int
+check_for_bootloader(libze_handle *lzeh) {
+    char *plugin = "systemdboot";
+
+    char p_buff[ZFS_MAXPROPLEN] = "";
+    if (libze_util_concat(ZE_PROP_NAMESPACE, ":", "bootloader", ZFS_MAXPROPLEN, p_buff) != 0) {
+        return -1;
+    }
+    nvlist_t *nvl;
+    if (nvlist_lookup_nvlist(lzeh->ze_props, p_buff, &nvl) != 0) {
+        // Unset
+        return 0;
+    }
+
+    void *p_handle = libze_plugin_open(plugin);
+    if (p_handle == NULL) {
+        fprintf(stderr, "Failed to open plugin %s\n", plugin);
+    } else {
+        if (libze_plugin_export(p_handle, &lzeh->lz_funcs) != 0) {
+            fprintf(stderr, "Failed to open %s export table\n", plugin);
+        } else {
+            lzeh->lz_funcs->plugin_init(lzeh);
+//            lzeh->lz_funcs->plugin_pre_activate(lzeh);
+//            lzeh->lz_funcs->plugin_mid_activate(lzeh);
+//            lzeh->lz_funcs->plugin_post_activate(lzeh);
+        }
+        libze_plugin_close(p_handle);
+    }
+
+    return 0;
 }
 
 /**
@@ -98,6 +142,16 @@ libze_init(void) {
                        sizeof(lzeh->bootfs), NULL, B_TRUE) != 0) {
         goto err;
     }
+
+    if (libze_get_be_props(lzeh, &lzeh->ze_props, ZE_PROP_NAMESPACE) != 0) {
+        goto err;
+    }
+
+    if (check_for_bootloader(lzeh) != 0) {
+        goto err;
+    }
+
+    (void) libze_error_set(lzeh, LIBZE_ERROR_SUCCESS, NULL);
 
     free(zpool);
     return lzeh;
@@ -428,9 +482,64 @@ err:
     return ret;
 }
 
+boolean_t
+libze_is_active_be(libze_handle *lzeh, char be_dataset[static 1]) {
+    return ((strcmp(lzeh->bootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
+}
+
+/**
+ * @brief
+ * @param lzeh
+ * @param options
+ * @return
+ */
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options) {
+    /*
+     * Steps:
+     *   * Get bootloader
+     *   * pre_activate
+     *   * Check if BE exists
+     *   * If BE exists and not active, activate, else return
+     *      * if not currently mounted at '/'
+     *          * if mounted, unmount
+     *          * set canmount=noauto before mount
+     *          * if plugin
+     *              * mount to tmpdir
+     *              * mid_activate
+     *              * unmount
+     *      * set post props
+     *      * set bootfs=BE
+     *   * Set required child settings
+     *      * canmount=noauto
+     *      * promote if clone
+     *   * post_activate
+     */
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
+    char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat(lzeh->be_root, "/", options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "Requested boot environment %s exceeds max length %d\n",
+                               options->be_name, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) {
+        return libze_error_set(lzeh,LIBZE_ERROR_EEXIST,
+                "Boot environment %s does not exist\n", options->be_name);
+    }
+
+    boolean_t active = libze_is_active_be(lzeh, be_ds_buff);
+    if (active) {
+        return LIBZE_ERROR_SUCCESS;
+    }
+
+    if (lzeh->lz_funcs != NULL) {
+        if (lzeh->lz_funcs->plugin_pre_activate(lzeh) != 0) {
+            return LIBZE_ERROR_PLUGIN;
+        }
+    }
+    return ret;
 }
 
 // References:
@@ -456,8 +565,8 @@ libze_channel_program(libze_handle *lzeh, const char *zcp, nvlist_t *nvl, nvlist
 #if defined(ZOL_VERSION) && ZOL_VERSION >= 8
     int err = lzc_channel_program(lzeh->zpool, zcp, instrlimit, memlimit, nvl, outnvl);
     if (err != 0) {
-        fprintf(stderr, "Failed to run channel program\n");
-        ret = LIBZE_ERROR_LIBZFS;
+        ret = libze_error_set(lzeh, LIBZE_ERROR_LIBZFS,
+                "Failed to run channel program\n");
     }
 #else
 #if defined(ZOL_VERSION)
@@ -521,12 +630,32 @@ libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[s
         goto err;
     }
 
-//    dump_nvlist(filtered_user_props, 0);
-
     *result = filtered_user_props;
     return ret;
 err:
     zfs_close(zhp);
     fnvlist_free(filtered_user_props);
     return ret;
+}
+
+libze_error
+libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
+    if (lzeh == NULL) {
+        return lze_err;
+    }
+
+    if (lze_fmt == NULL) {
+        strlcpy(lzeh->libze_err, "", LIBZE_MAXPATHLEN);
+        return lze_err;
+    }
+
+    va_list argptr;
+    va_start(argptr, lze_fmt);
+    // TODO: Check too long?
+    int length = vsnprintf(lzeh->libze_err, LIBZE_MAXPATHLEN, lze_fmt, argptr);
+    va_end(argptr);
+
+    assert(length < LIBZE_MAXPATHLEN);
+
+    return lze_err;
 }

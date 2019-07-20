@@ -9,6 +9,8 @@
 
 #define LIBZE_MAXPATHLEN    512
 
+extern const char *ZE_PROP_NAMESPACE;
+
 typedef enum libze_error {
     LIBZE_ERROR_SUCCESS = 0,
     LIBZE_ERROR_LIBZFS,
@@ -16,17 +18,25 @@ typedef enum libze_error {
     LIBZE_ERROR_UNKNOWN,
     LIBZE_ERROR_EPERM,
     LIBZE_ERROR_NOMEM,
-    LIBZE_ERROR_EEXIST         /* Dataset/fs/snapshot doesn't exist */
+    LIBZE_ERROR_EEXIST,         /* Dataset/fs/snapshot doesn't exist */
+    LIBZE_ERROR_MAXPATHLEN,     /* Dataset/fs/snapshot exceeds LIBZE_MAXPATHLEN */
+    LIBZE_ERROR_PLUGIN
 } libze_error;
 
-typedef struct libze_handle {
+typedef struct libze_handle libze_handle;
+typedef struct libze_plugin_fn_export libze_plugin_fn_export;
+
+struct libze_handle {
     libzfs_handle_t *lzh;
     zpool_handle_t *lzph;
     char be_root[LIBZE_MAXPATHLEN];
     char rootfs[LIBZE_MAXPATHLEN];
     char bootfs[LIBZE_MAXPATHLEN];
     char zpool[LIBZE_MAXPATHLEN];
-} libze_handle;
+    libze_plugin_fn_export *lz_funcs;
+    nvlist_t *ze_props;
+    char libze_err[LIBZE_MAXPATHLEN];
+};
 
 typedef struct libze_clone_cbdata {
     nvlist_t **outnvl;
@@ -84,11 +94,16 @@ typedef struct libze_activate_options {
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options);
 
+boolean_t
+libze_is_active_be(libze_handle *lzeh, char be[static 1]);
+
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]);
 libze_error
 libze_bootloader_fini(libze_bootloader *bootloader);
+
 libze_error
-libze_bootloader_systemd_pre(libze_handle *lzeh);
+libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...);
+
 
 #endif //ZECTL_LIBZE_H

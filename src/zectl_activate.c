@@ -34,9 +34,23 @@ ze_activate(libze_handle *lzeh, int argc, char **argv) {
 
     options.be_name = argv[0];
 
-    libze_activate(lzeh, &options);
+    char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat(lzeh->be_root, "/",
+            options.be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != 0) {
+        fprintf(stderr, "Requested boot environment %s exceeds max length %d\n",
+                options.be_name, ZFS_MAX_DATASET_NAME_LEN);
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+
+    if (libze_is_active_be(lzeh, be_ds_buff)) {
+        fprintf(stderr, "Boot environment %s is already active\n", options.be_name);
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
+    if ((ret = libze_activate(lzeh, &options)) != LIBZE_ERROR_SUCCESS) {
+        fputs(lzeh->libze_err, stderr);
+    }
 
 err:
-
     return ret;
 }

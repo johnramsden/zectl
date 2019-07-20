@@ -6,10 +6,10 @@
 #include <errno.h>
 
 #include "libze/libze.h"
-#include "libze_util/libze_util.h"
+#include "libze/libze_util.h"
+#include "libze/libze_plugin_manager.h"
 
 extern const char *ZE_PROGRAM;
-extern const char *ZE_PROP_NAMESPACE;
 
 void
 ze_usage(void);

@@ -1,4 +1,4 @@
-#include "libze_util/libze_util.h"
+#include "libze/libze_util.h"
 
 #include <stdlib.h>
 #include <string.h>
