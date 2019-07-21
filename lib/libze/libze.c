@@ -23,7 +23,7 @@ libze_get_root_dataset(libze_handle *lzeh) {
     char rootfs[LIBZE_MAXPATHLEN];
 
     // Make sure type is ZFS
-    if (system_linux_get_dataset("/", rootfs, LIBZE_MAXPATHLEN) != SYSTEM_ERR_SUCCESS) {
+    if (libze_dataset_from_mountpoint("/", rootfs, LIBZE_MAXPATHLEN) != SYSTEM_ERR_SUCCESS) {
         return -1;
     }
 
@@ -82,9 +82,6 @@ check_for_bootloader(libze_handle *lzeh) {
             fprintf(stderr, "Failed to open %s export table\n", plugin);
         } else {
             lzeh->lz_funcs->plugin_init(lzeh);
-//            lzeh->lz_funcs->plugin_pre_activate(lzeh);
-//            lzeh->lz_funcs->plugin_mid_activate(lzeh);
-//            lzeh->lz_funcs->plugin_post_activate(lzeh);
         }
         libze_plugin_close(p_handle);
     }
@@ -119,7 +116,7 @@ libze_init(void) {
     }
 
     size_t pool_length = (slashp)-(lzeh->be_root);
-    zpool = malloc(pool_length+1);
+    zpool = calloc(1, pool_length+1);
     if (zpool == NULL) {
         goto err;
     }
@@ -488,10 +485,157 @@ libze_is_active_be(libze_handle *lzeh, char be_dataset[static 1]) {
 }
 
 /**
- * @brief
- * @param lzeh
- * @param options
- * @return
+ * @brief set be required props
+ * @param lzeh Open libze_handle
+ * @param be_zh Open zfs handle
+ * @return libze_error
+ */
+static libze_error
+set_be_props(libze_handle *lzeh, zfs_handle_t *be_zh, const char be_name[static 1]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    nvlist_t *props = fnvlist_alloc();
+    if (props == NULL) {
+        return LIBZE_ERROR_NOMEM;
+    }
+    nvlist_add_string(props, "canmount", "noauto");
+    if (strcmp(lzeh->rootfs, be_name) != 0) {
+        nvlist_add_string(props, "mountpoint", "/");
+    }
+
+    if (zfs_prop_set_list(be_zh, props) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to set properties for %s:\n"
+                "\tcanmount=noauto\n\tmountpoint=/\n\n", be_name);
+        goto err;
+    }
+
+    if (zpool_set_prop(lzeh->lzph, "bootfs", be_name) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                              "Failed setting bootfs=%s\n", be_name);
+        goto err;
+    }
+
+err:
+    nvlist_free(props);
+    return ret;
+}
+
+typedef struct libze_activate_cbdata {
+    libze_handle *lzeh;
+} libze_activate_cbdata;
+
+static int
+libze_activate_cb(zfs_handle_t *zhdl, void *data) {
+    char buf[LIBZE_MAXPATHLEN];
+    libze_activate_cbdata *cbd = data;
+
+    if (zfs_prop_set(zhdl, "canmount", "noauto") != 0) {
+        return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed setting canmount=noauto for %s\n", zfs_get_name(zhdl));
+    }
+
+    // Check if clone
+    if (zfs_prop_get(zhdl, ZFS_PROP_ORIGIN, buf,
+                     sizeof(buf), NULL, NULL, 0, 1) != 0) {
+        // Not a clone, continue
+        return 0;
+    }
+
+    if (zfs_promote(zhdl) != 0) {
+        return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed promoting %s\n", zfs_get_name(zhdl));
+    }
+
+    if (zfs_iter_filesystems(zhdl, libze_activate_cb, cbd) != 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
+static libze_error
+mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *be_zh) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    char *tmp_dirname = "/";
+    const char *ds_name = zfs_get_name(be_zh);
+    boolean_t is_root = B_TRUE;
+
+
+    nvlist_t *props = fnvlist_alloc();
+    if (props == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_NOMEM, "Couldn't allocate memory\n");
+    }
+    nvlist_add_string(props, "canmount", "noauto");
+
+    if (strcmp(lzeh->rootfs, ds_name) != 0) {
+        is_root = B_FALSE;
+        nvlist_add_string(props, "mountpoint", "/");
+
+        // Not currently mounted
+        char temp_directory_template[LIBZE_MAXPATHLEN] = "";
+        if (libze_util_concat("/tmp/ze.", options->be_name, ".XXXXXX",
+                              LIBZE_MAXPATHLEN, temp_directory_template) != 0) {
+            return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                   "Could not create directory template\n");
+        }
+
+        // Create tmp mountpoint
+        tmp_dirname = mkdtemp(temp_directory_template);
+        if (tmp_dirname == NULL) {
+            return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                    "Could not create tmp directory %s\n", temp_directory_template);
+        }
+
+        // AFTER here always goto err to cleanup
+
+        if (zfs_prop_set(be_zh, "mountpoint", tmp_dirname) != 0) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                    "Failed to set mountpoint=%s for %s\n", temp_directory_template, ds_name);
+            goto err;
+        }
+
+        if (zfs_mount(be_zh, NULL, 0) != 0) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                    "Failed to mount %s to %s\n", ds_name, temp_directory_template);
+            goto err;
+        }
+    }
+
+    // mid_activate
+    if ((lzeh->lz_funcs != NULL) &&
+        (lzeh->lz_funcs->plugin_mid_activate(lzeh, tmp_dirname) != 0)) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN, "Failed to run mid-activate hook\n");
+        goto err;
+    }
+
+err:
+    if (!is_root && zfs_is_mounted(be_zh, NULL)) {
+        // Retain existing error if occurrred
+        if ((zfs_unmount(be_zh, NULL, 0) != 0) && (ret != LIBZE_ERROR_SUCCESS)) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                    "Failed to unmount %s", ds_name);
+        } else {
+            rmdir(tmp_dirname);
+            if ((zfs_prop_set_list(be_zh, props) != 0) && (ret != LIBZE_ERROR_SUCCESS)) {
+                ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                      "Failed to unset mountpoint for %s:\n", ds_name);
+            }
+        }
+    }
+    nvlist_free(props);
+    return ret;
+}
+
+/**
+ * @brief Based on @p options, activate a boot environment
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param options The options based on which the boot environment is activated
+ * @return LIBZE_ERROR_SUCCESS on success,
+ *         or LIBZE_ERROR_EEXIST, LIBZE_ERROR_PLUGIN, LIBZE_ERROR_ZFS_OPEN,
+ *         LIBZE_ERROR_UNKNOWN
+ *
+ * @invariant @p be_zh closed on exit
  */
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options) {
@@ -508,7 +652,7 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
      *              * mount to tmpdir
      *              * mid_activate
      *              * unmount
-     *      * set post props
+     *      * set post props, canmount=noauto
      *      * set bootfs=BE
      *   * Set required child settings
      *      * canmount=noauto
@@ -525,20 +669,51 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
     }
 
     if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) {
-        return libze_error_set(lzeh,LIBZE_ERROR_EEXIST,
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
                 "Boot environment %s does not exist\n", options->be_name);
     }
 
-    boolean_t active = libze_is_active_be(lzeh, be_ds_buff);
-    if (active) {
-        return LIBZE_ERROR_SUCCESS;
+
+    if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_pre_activate(lzeh) != 0)) {
+        return LIBZE_ERROR_PLUGIN;
     }
 
-    if (lzeh->lz_funcs != NULL) {
-        if (lzeh->lz_funcs->plugin_pre_activate(lzeh) != 0) {
-            return LIBZE_ERROR_PLUGIN;
-        }
+    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET);
+    if (be_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                               "Failed opening dataset %s\n", be_ds_buff);
     }
+
+    if (mid_activate(lzeh, options, be_zh) != LIBZE_ERROR_SUCCESS) {
+        goto err;
+    }
+
+    if (zpool_set_prop(lzeh->lzph, "bootfs", be_ds_buff) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                              "Failed setting bootfs=%s\n", be_ds_buff);
+        goto err;
+    }
+
+    libze_activate_cbdata cbd = { lzeh };
+
+    // Set for top level dataset
+    if (libze_activate_cb(be_zh, &cbd) != 0) {
+        ret = LIBZE_ERROR_UNKNOWN;
+        goto err;
+    }
+
+    // Set for all child datasets and promote
+    if (zfs_iter_filesystems(be_zh, libze_clone_cb, &cbd) != 0) {
+        ret = LIBZE_ERROR_UNKNOWN;
+        goto err;
+    }
+
+    if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_activate(lzeh) != 0)) {
+        goto err;
+    }
+
+err:
+    zfs_close(be_zh);
     return ret;
 }
 
@@ -604,6 +779,20 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl, const cha
     return ret;
 }
 
+/**
+ * @brief Get all the ZFS properties which have been set with the @p namespace prefix
+ *        and return them in @a result
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[out] result Properties of boot environment
+ * @param[in] namespace ZFS property prefix
+ * @return LIBZE_ERROR_SUCCESS on success, or
+ *         LIBZE_ERROR_ZFS_OPEN, LIBZE_ERROR_UNKNOWN, LIBZE_ERROR_NOMEM
+ *
+ * @invariant @p lzeh != NULL
+ * @invariant @p namespace != NULL
+ * @invariant @p zhp is closed on exit
+ * @invariant @p filtered_user_props is free'd on error, or allocated is success
+ */
 libze_error
 libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]) {
     nvlist_t *user_props = NULL;
@@ -630,14 +819,28 @@ libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[s
         goto err;
     }
 
+    zfs_close(zhp);
     *result = filtered_user_props;
     return ret;
 err:
     zfs_close(zhp);
+    fnvlist_free(user_props);
     fnvlist_free(filtered_user_props);
     return ret;
 }
 
+/**
+ * @brief Set an error message to @p lzeh->libze_err and return the error type
+ *        given in @p lze_err.
+ * @param[in,out] initialized lzeh libze handle
+ * @param[in] lze_err Error value returned
+ * @param[in] lze_fmt Format specifier used by @p lzeh
+ * @param ... Variable args used to format the error message saved in @p lzeh
+ * @return @p lze_err
+ *
+ * @invariant @p lzeh != NULL
+ * @invariant if @p lze_fmt == NULL, @p ... should have zero arguments.
+ */
 libze_error
 libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
     if (lzeh == NULL) {

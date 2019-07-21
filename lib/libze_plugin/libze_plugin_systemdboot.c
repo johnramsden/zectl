@@ -11,8 +11,9 @@ int libze_plugin_systemdboot_pre_activate(libze_handle *lzeh) {
 
     return 0;
 }
-int libze_plugin_systemdboot_mid_activate(libze_handle *lzeh) {
-    puts("sd_mid_activate");
+int libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, char be_mountpoint[static 2]) {
+    fputs("sd_mid_activate: ", stdout);
+    puts(be_mountpoint);
 
     return 0;
 }

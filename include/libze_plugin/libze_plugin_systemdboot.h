@@ -9,7 +9,7 @@
 
 int libze_plugin_systemdboot_init(libze_handle *lzeh);
 int libze_plugin_systemdboot_pre_activate(libze_handle *lzeh);
-int libze_plugin_systemdboot_mid_activate(libze_handle *lzeh);
+int libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, char be_mountpoint[static 2]);
 int libze_plugin_systemdboot_post_activate(libze_handle *lzeh);
 
 libze_plugin_fn_export exported_plugin = {

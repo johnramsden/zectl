@@ -11,11 +11,11 @@
 #include "system_linux.h"
 #include "libze/libze_util.h"
 
-system_linux_error
-system_linux_get_dataset(char mountpoint[static 1], char dataset[static 1], size_t length) {
+system_fs_error
+libze_dataset_from_mountpoint(char *mountpoint, char *dataset, size_t length) {
 
     struct mntent *ent = NULL;
-    system_linux_error ret = SYSTEM_ERR_SUCCESS;
+    system_fs_error ret = SYSTEM_ERR_SUCCESS;
 
     const char *mnt_location_file = "/proc/mounts";
     FILE *mnt_file = setmntent(mnt_location_file, "r");
