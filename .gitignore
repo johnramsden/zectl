@@ -5,3 +5,5 @@ cmake-build-*
 .idea
 
 src/zcp\.h
+
+doxy
