@@ -1,9 +1,14 @@
-#include "libze/libze_util.h"
-
-#include <stdlib.h>
 #include <string.h>
-#include <libzfs.h>
 
+/**
+ * @brief Concatenate two strings with a separator
+ * @param[in] prefix Prefix string
+ * @param[in] separator Separator string
+ * @param[in] suffix Suffix string
+ * @param[in] buflen Length of buffer
+ * @param[out] buf Resulting concatenated string
+ * @return Nonzero if the resulting string is longer than the buffer length
+ */
 int
 libze_util_concat(const char *prefix, const char *separator, const char *suffix,
                   size_t buflen, char buf[buflen]) {
@@ -16,6 +21,14 @@ libze_util_concat(const char *prefix, const char *separator, const char *suffix,
     return 0;
 }
 
+/**
+ * @brief Cut a string at the last instance of a delimiter
+ * @param[in] path String to cut
+ * @param[in] buflen Length of buffer
+ * @param[out] buf  Prefix before last instance of delimiter
+ * @param[in] delimiter Delimiter to cut string at
+ * @return Nonzero if buffer is too short, or there is no instance of delimiter
+ */
 int
 libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char delimiter) {
     char *slashp = NULL;
@@ -34,32 +47,15 @@ libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char 
     return 0;
 }
 
-char *
-libze_util_file_contents(const char file[static 1]) {
-    char *buffer = NULL;
-    FILE *fp = fopen(file, "rb");
-
-    if (fp == NULL) {
-        return NULL;
-    }
-
-    fseek(fp, 0, SEEK_END);
-    size_t length = (size_t)ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    buffer = malloc(length);
-    if (buffer != NULL) {
-        fread(buffer, 1, length, fp);
-    }
-    fclose(fp);
-
-    return buffer;
-}
-
-/*
-* Given a complete name, return just the portion that refers to the suffix.
-* Will return -1 if there is no parent (path is just the name of the
-* pool).
-*/
+/**
+ * @brief Given a dataset, return just the portion after the root of boot environments
+ * @param[in] root Root of boot environments
+ * @param[in] dataset Full beta set to get suffix of
+ * @param[in] buflen Length of buffer
+ * @param[out] buf Buffer to place suffix in
+ * @return Non-zero if there is no parent (path is just the name of the pool),
+ *         or if the length of the buffer is exceeded
+ */
 int
 libze_util_suffix_after_string(const char root[static 1], const char dataset[static 1], size_t buflen,
                                char buf[buflen]) {
@@ -81,9 +77,17 @@ libze_util_suffix_after_string(const char root[static 1], const char dataset[sta
     return 0;
 }
 
+/**
+ * @brief Given a dataset, get the name of the boot environment
+ * @param[in] dataset Dataset to get the boot environment of
+ * @param[in] buflen Length of buffer
+ * @param[out] buf Buffer to place boot environment in
+ * @return Non-zero if the length of the buffer is exceeded,
+ *         or if there is no / contained in the data set
+ */
 int
-libze_boot_env_name(const char *dataset, size_t buflen, char *buf) {
-    char *slashp;
+libze_boot_env_name(const char *dataset, size_t buflen, char buf[buflen]) {
+    char *slashp = NULL;
 
     if (strlcpy(buf, dataset, buflen) >= buflen) {
         return -1;
@@ -102,3 +106,25 @@ libze_boot_env_name(const char *dataset, size_t buflen, char *buf) {
     return 0;
 }
 
+#ifdef UNUSED
+char *
+libze_util_file_contents(const char file[static 1]) {
+    char *buffer = NULL;
+    FILE *fp = fopen(file, "rb");
+
+    if (fp == NULL) {
+        return NULL;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    size_t length = (size_t)ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    buffer = malloc(length);
+    if (buffer != NULL) {
+        fread(buffer, 1, length, fp);
+    }
+    fclose(fp);
+
+    return buffer;
+}
+#endif

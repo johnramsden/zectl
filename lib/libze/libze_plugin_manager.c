@@ -1,11 +1,15 @@
 #include <dlfcn.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "libze/libze_plugin_manager.h"
 
 #define PLUGIN_MAX_PATHLEN 512
 
+/**
+ * @brief Open the handle to the specified plugin library.
+ * @param[in] ze_plugin Name of the plugin
+ * @return Handle to the library, or @p NULL if it doesn't exist
+ */
 void *
 libze_plugin_open(char *ze_plugin) {
 #ifndef PLUGINS_DIRECTORY
@@ -19,20 +23,28 @@ libze_plugin_open(char *ze_plugin) {
         return NULL;
     }
 
-    void* libhandle = dlopen(plugin_path, RTLD_NOW);
-    if (libhandle == NULL) {
-        fprintf(stderr, "%s", dlerror());
-        return NULL;
-    }
-
-    return libhandle;
+    // NULL if plugin nonexistent
+    return dlopen(plugin_path, RTLD_NOW);
 }
 
+/**
+ * @brief Close handle to the plugin library
+ * @param[in] libhandle Handle to the plugin library
+ * @return Nonzero on error
+ */
 int
 libze_plugin_close(void *libhandle) {
     return dlclose(libhandle);
 }
 
+/**
+ * @brief Export a symbol, @p libze_plugin_fn_export , from the plugin
+ * @param libhandle Handle to the plugin library
+ * @param[out] ze_export Exported functions from the library, NULL on error
+ * @return Non-zero on failure.
+ *
+ * @invariant libhandle != NULL
+ */
 int
 libze_plugin_export(void *libhandle, libze_plugin_fn_export **ze_export) {
     // Clear errors

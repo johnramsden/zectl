@@ -104,6 +104,7 @@ libze_bootloader_fini(libze_bootloader *bootloader);
 
 libze_error
 libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...);
-
+libze_error
+libze_error_nomem(libze_handle *lzeh);
 
 #endif //ZECTL_LIBZE_H

@@ -1,8 +1,8 @@
 #include "libze/libze.h"
-#include "libze_util/libze_util.h"
+#include "libze/libze_util.h"
 
-libze_error_t
-libze_bootloader_init(libze_handle_t *lzeh, libze_bootloader_t *bootloader, const char ze_namespace[static 1]) {
+libze_error
+libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]) {
     nvlist_t *out_props = NULL;
     if (libze_get_be_props(lzeh, &out_props, ze_namespace) != LIBZE_ERROR_SUCCESS) {
         return -1;
@@ -20,8 +20,8 @@ libze_bootloader_init(libze_handle_t *lzeh, libze_bootloader_t *bootloader, cons
     return LIBZE_ERROR_SUCCESS;
 }
 
-libze_error_t
-libze_bootloader_fini(libze_bootloader_t *bootloader) {
+libze_error
+libze_bootloader_fini(libze_bootloader *bootloader) {
     if (bootloader->prop != NULL) {
         fnvlist_free(bootloader->prop);
     }
