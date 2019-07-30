@@ -88,6 +88,11 @@ typedef struct libze_activate_options {
     boolean_t noconfirm;
 } libze_activate_options;
 
+typedef struct libze_destroy_options {
+    char *be_name;
+    boolean_t noconfirm;
+} libze_destroy_options;
+
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options);
 
