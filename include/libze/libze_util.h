@@ -20,9 +20,6 @@
 #define DEBUG_PRINT(fmt, args...) /* Don't do anything in release builds */
 #endif
 
-char *
-libze_util_file_contents(const char file[static 1]);
-
 int
 libze_util_concat(const char *prefix, const char *separator, const char *suffix,
                   size_t buflen, char buf[buflen]);

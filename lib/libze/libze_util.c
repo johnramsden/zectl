@@ -105,26 +105,3 @@ libze_boot_env_name(const char *dataset, size_t buflen, char buf[buflen]) {
 
     return 0;
 }
-
-#ifdef UNUSED
-char *
-libze_util_file_contents(const char file[static 1]) {
-    char *buffer = NULL;
-    FILE *fp = fopen(file, "rb");
-
-    if (fp == NULL) {
-        return NULL;
-    }
-
-    fseek(fp, 0, SEEK_END);
-    size_t length = (size_t)ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    buffer = malloc(length);
-    if (buffer != NULL) {
-        fread(buffer, 1, length, fp);
-    }
-    fclose(fp);
-
-    return buffer;
-}
-#endif

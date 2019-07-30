@@ -20,23 +20,6 @@ message(STATUS "ZOL_VERSION=${ZOL_VERSION}")
 add_compile_definitions(ZOL_VERSION=${ZOL_VERSION})
 add_compile_definitions(DEBUG=1)
 
-set(DATA_DIR data)
-
-# LUA Scripts ------------------------------------------------------------------
-
-#set(ZCP_SCRIPTS
-#        ${CMAKE_SOURCE_DIR}/${DATA_DIR}/zcp/list.lua
-#)
-#
-#foreach(zcp ${ZCP_SCRIPTS})
-#
-#    # copy zcps to build dir
-#    if(${zcp} MATCHES "(lua)$")
-#        file(COPY ${zcp} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-#    endif()
-#
-#endforeach()
-
 add_subdirectory(src)
 add_subdirectory(lib)
 add_subdirectory(tests)

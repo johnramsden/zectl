@@ -57,9 +57,6 @@ void
 libze_list_free(nvlist_t *nvl);
 
 libze_error
-libze_channel_program(libze_handle *lzeh, const char *zcp_file, nvlist_t *nvl, nvlist_t **out_nvl);
-
-libze_error
 libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suffix[static 1], char be[static 1],
             boolean_t recursive);
 
