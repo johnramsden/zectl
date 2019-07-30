@@ -1,8 +1,3 @@
-/*
- * Copyright (c) 2018, John Ramsden.
- * https://github.com/johnramsden/zectl/blob/master/LICENSE.md
- */
-
 // Make sure libspl mnttab.h isn't imported, creates getmnttent conflict
 #define _SYS_MNTTAB_H
 

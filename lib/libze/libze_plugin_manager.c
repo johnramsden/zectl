@@ -43,7 +43,7 @@ libze_plugin_close(void *libhandle) {
  * @param[out] ze_export Exported functions from the library, NULL on error
  * @return Non-zero on failure.
  *
- * @invariant libhandle != NULL
+ * @pre libhandle != NULL
  */
 int
 libze_plugin_export(void *libhandle, libze_plugin_fn_export **ze_export) {

@@ -22,3 +22,8 @@ int libze_plugin_systemdboot_post_activate(libze_handle *lzeh) {
 
     return 0;
 }
+int libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char be_name[static 1]) {
+    puts("sd_post_destroy");
+
+    return 0;
+}

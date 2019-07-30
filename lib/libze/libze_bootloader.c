@@ -1,11 +1,22 @@
 #include "libze/libze.h"
 #include "libze/libze_util.h"
 
+/**
+ * @brief Initialize bootloader and gather it's relevant properties
+ * @param lzeh Initialized @p libze_handle
+ * @param bootloader Initialize @p libze_bootloader
+ * @param ze_namespace ZFS property namespace
+ * @return @p LIBZE_ERROR_SUCCESS on success, @p LIBZE_ERROR_UNKNOWN on failure
+ *
+ * @pre lzeh != NULL
+ * @pre bootloader != NULL
+ * @pre (ze_namespace != NULL) && (strlen(ze_namespace) >= 1)
+ */
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]) {
     nvlist_t *out_props = NULL;
     if (libze_get_be_props(lzeh, &out_props, ze_namespace) != LIBZE_ERROR_SUCCESS) {
-        return -1;
+        return LIBZE_ERROR_UNKNOWN;
     }
 
     char prop[ZFS_MAXPROPLEN] = "";
@@ -20,9 +31,14 @@ libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const ch
     return LIBZE_ERROR_SUCCESS;
 }
 
+/**
+ * @brief Close bootloader
+ * @param[in] bootloader Initialized bootloader
+ * @return LIBZE_ERROR_SUCCESS on success
+ */
 libze_error
 libze_bootloader_fini(libze_bootloader *bootloader) {
-    if (bootloader->prop != NULL) {
+    if ((bootloader != NULL) && (bootloader->prop != NULL)) {
         fnvlist_free(bootloader->prop);
     }
     // TODO: ???

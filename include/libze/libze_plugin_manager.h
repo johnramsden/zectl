@@ -13,11 +13,13 @@ typedef int (*plugin_fn_init)(libze_handle *lzeh);
 typedef int (*plugin_fn_pre_activate)(libze_handle *lzeh);
 typedef int (*plugin_fn_mid_activate)(libze_handle *lzeh, char be_mountpoint[static 2]);
 typedef int (*plugin_fn_post_activate)(libze_handle *lzeh);
+typedef int (*plugin_fn_post_destroy)(libze_handle *lzeh, char be_name[static 1]);
 typedef struct libze_plugin_fn_export {
     plugin_fn_init plugin_init;
     plugin_fn_pre_activate plugin_pre_activate;
     plugin_fn_mid_activate plugin_mid_activate;
     plugin_fn_post_activate plugin_post_activate;
+    plugin_fn_post_destroy plugin_post_destroy;
 } libze_plugin_fn_export;
 
 void *

@@ -2,7 +2,7 @@ add_compile_definitions(PLUGINS_DIRECTORY=\"${CMAKE_CURRENT_BINARY_DIR}/../libze
 
 set(LIBZE_SOURCE_FILES
         libze.c system_linux.c system_linux.h
-        bootloader/bootloader.c libze_plugin_manager.c libze_util.c)
+        libze_bootloader.c libze_plugin_manager.c libze_util.c)
 
 add_library(libze ${LIBZE_SOURCE_FILES})
 set_property(TARGET libze PROPERTY PREFIX "")

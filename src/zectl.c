@@ -106,6 +106,7 @@ main(int argc, char *argv[]) {
         }
     }
 
+    // TODO: Add back after testing
 //    if (strcmp(ze_argv[0], "list") != 0) {
 //        if(geteuid() != 0) {
 //            fprintf(stderr, "Permission denied, try again as root.\n");

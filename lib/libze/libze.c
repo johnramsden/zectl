@@ -18,7 +18,8 @@ const char *ZE_PROP_NAMESPACE = "org.zectl";
  * @brief Get the root dataset
  * @param[in] lzeh Initialized @p libze_handle
  * @return Non-zero on success
- * @invariant lzeh != NULL
+ *
+ * @pre lzeh != NULL
  */
 int
 libze_get_root_dataset(libze_handle *lzeh) {
@@ -48,10 +49,10 @@ libze_get_root_dataset(libze_handle *lzeh) {
  * @brief @p libze_handle cleanup.
  * @param lzeh @p libze_handle to de-allocate and close resources on.
  *
- * @invariant lzeh->lzh is closed on exit
- * @invariant lzeh->lzph is closed on exit
- * @invariant lzeh->ze_props is free'd on exit
- * @invariant lzeh is free'd on exit
+ * @post @p lzeh->lzh is closed
+ * @post @p lzeh->lzph is closed
+ * @post @p lzeh->ze_props is free'd
+ * @post @p lzeh is free'd
  */
 void
 libze_fini(libze_handle *lzeh) {
@@ -76,11 +77,10 @@ libze_fini(libze_handle *lzeh) {
 /**
  * @brief Check if a plugin is set, if it is initialize it.
  * @param lzeh Initialized @p libze_handle
- * @return @p LIBZE_ERROR_SUCCESS on success, LIBZE_ERROR_PLUGIN on failure
+ * @return @p LIBZE_ERROR_SUCCESS on success, @p LIBZE_ERROR_PLUGIN on failure
  *
- * @invariant if @a lzeh->ze_props contains an existing org.zectl:bootloader,
- *            the bootloader is initialized successfully.
- * @invariant if a plugin is opened with @a libze_plugin_open, it is closed with @a libze_plugin_close
+ * @post if @a lzeh->ze_props contains an existing org.zectl:bootloader,
+ *            the bootloader plugin is initialized.
  */
 static libze_error
 check_for_bootloader(libze_handle *lzeh) {
@@ -133,9 +133,6 @@ check_for_bootloader(libze_handle *lzeh) {
 /**
  * @brief Initialize libze handle.
  * @return Initialized handle, or NULL if unsuccessful.
- *
- * @invariant lzeh closed on error
- * @invariant zpool free'd on error
  */
 libze_handle *
 libze_init(void) {
@@ -215,8 +212,8 @@ typedef struct libze_list_cbdata {
  * @param[in,out] data Pointer to initialized @p libze_list_cbdata_t struct.
  * @return Non-zero on failure.
  *
- * @invariant @p zhdl != NULL
- * @invariant @p data != NULL
+ * @pre @p zhdl != NULL
+ * @pre @p data != NULL
  */
 static int
 libze_list_cb(zfs_handle_t *zhdl, void *data) {
@@ -312,9 +309,6 @@ err:
  * @param[in,out] outnvl Reference to an @p nvlist_t*, populated with valid 'list properties'
  * @return @p LIBZE_ERROR_SUCCESS on success, @p LIBZE_ERROR_LIBZFS,
  *         @p LIBZE_ERROR_ZFS_OPEN, or @p LIBZE_ERROR_NOMEM on failure.
- *
- * @invariant zroot_hdl closed on exit
- * @invariant libzfs_core_fini run on exit if initialized.
  */
 libze_error
 libze_list(libze_handle *lzeh, nvlist_t **outnvl) {
@@ -354,8 +348,6 @@ err:
 /**
  * @brief Free nested nvlist one level down.
  * @param nvl @p nvlist_t to free
- *
- * @invariant @p nvl is free'd on exit if nvl != NULL on input
  */
 static void
 libze_free_children_nvl(nvlist_t *nvl) {
@@ -440,8 +432,6 @@ clone_prop_cb(int prop, void *data) {
  * @param[in] zhdl Initialized @p zfs_handle_t representing current dataset
  * @param data Initialized @p libze_clone_cbdata to save properties into.
  * @return Non-zero on success.
- *
- * @invariant props free'd on exit if error occurred.
  */
 static int
 libze_clone_cb(zfs_handle_t *zhdl, void *data) {
@@ -483,6 +473,42 @@ err:
     return ret;
 }
 
+libze_error
+libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat(lzeh->be_root, "/", options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested boot environment %s exceeds max length %d\n",
+                options->be_name, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    // TODO
+    if (libze_is_active_be(lzeh, be_ds_buff)) {
+
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Boot environment %s does not exist\n", options->be_name);
+    }
+
+    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET);
+    if (be_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Failed opening dataset %s\n", be_ds_buff);
+    }
+
+
+    if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_destroy(lzeh, options->be_name) != 0)) {
+        return LIBZE_ERROR_PLUGIN;
+    }
+
+
+    return ret;
+}
+
 /**
  * @brief Create a recursive clone from a snapshot given the dataset and snapshot separately.
  *        The snapshot suffix should be the same for all nested datasets.
@@ -495,13 +521,10 @@ err:
  *         @p LIBZE_ERROR_ZFS_OPEN, @p LIBZE_ERROR_UNKNOWN,
  *         or @p LIBZE_ERROR_MAXPATHLEN on failure.
  *
- * @invariant lzeh != NULL
- * @invariant source_root != NULL
- * @invariant source_snap_suffix != NULL
- * @invariant be != NULL
- * @invariant cdata free'd on exit
- * @invariant snap_handle closed if opened
- * @invariant zroot_hdl on exit
+ * @pre lzeh != NULL
+ * @pre source_root != NULL
+ * @pre source_snap_suffix != NULL
+ * @pre be != NULL
  */
 libze_error
 libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suffix[static 1], char be[static 1],
@@ -601,7 +624,7 @@ err:
 /**
  * @brief Check if boot environment is active
  * @param[in] lzeh Initialized @p libze_handle
- * @param be_dataset Dataset to check if active
+ * @param[in] be_dataset Dataset to check if active
  * @return @p B_TRUE if active, @p B_FALSE otherwise.
  */
 boolean_t
@@ -618,8 +641,9 @@ typedef struct libze_activate_cbdata {
  * @param[in] zhdl Initialed @p zfs_handle_t to recurse based on.
  * @param[in,out] data @p libze_activate_cbdata to activate based on.
  * @return Non zero on failure.
- * @invariant zhdl != NULL
- * @invariant data != NULL
+ *
+ * @pre zhdl != NULL
+ * @pre data != NULL
  */
 static int
 libze_activate_cb(zfs_handle_t *zhdl, void *data) {
@@ -658,12 +682,10 @@ libze_activate_cb(zfs_handle_t *zhdl, void *data) {
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_UNKNOWN, or @p LIBZE_ERROR_PLUGIN on failure.
  *
- * @invariant lzeh != NULL
- * @invariant be_zh != NULL
- * @invariant options != NULL
- * @invariant props free'd on exit
- * @invariant be_zh dataset unmounted exit
- * @invariant Directory tmp_dirname deleted, if created, on exit
+ * @pre lzeh != NULL
+ * @pre be_zh != NULL
+ * @pre options != NULL
+ * @post if be_zh != root dataset, be_zh unmounted on exit
  */
 static libze_error
 mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *be_zh) {
@@ -745,8 +767,6 @@ err:
  * @return LIBZE_ERROR_SUCCESS on success,
  *         or LIBZE_ERROR_EEXIST, LIBZE_ERROR_PLUGIN, LIBZE_ERROR_ZFS_OPEN,
  *         LIBZE_ERROR_UNKNOWN
- *
- * @invariant @p be_zh closed on exit
  */
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options) {
@@ -815,8 +835,9 @@ err:
  * @param namespace Prefix property to filter based on
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_UNKNOWN on failure.
- * @invariant @p unfiltered_nvl != NULL
- * @invariant @p namespace != NULL
+ *
+ * @pre @p unfiltered_nvl != NULL
+ * @pre @p namespace != NULL
  */
 static libze_error
 libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl, const char namespace[static 1]) {
@@ -857,10 +878,8 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl, const cha
  * @return LIBZE_ERROR_SUCCESS on success, or
  *         LIBZE_ERROR_ZFS_OPEN, LIBZE_ERROR_UNKNOWN, LIBZE_ERROR_NOMEM
  *
- * @invariant @p lzeh != NULL
- * @invariant @p namespace != NULL
- * @invariant @p zhp is closed on exit
- * @invariant @p filtered_user_props is free'd on error, or allocated is success
+ * @pre @p lzeh != NULL
+ * @pre @p namespace != NULL
  */
 libze_error
 libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]) {
@@ -910,8 +929,8 @@ err:
  * @param ... Variable args used to format the error message saved in @p lzeh
  * @return @p lze_err
  *
- * @invariant @p lzeh != NULL
- * @invariant if @p lze_fmt == NULL, @p ... should have zero arguments.
+ * @pre @p lzeh != NULL
+ * @pre if @p lze_fmt == NULL, @p ... should have zero arguments.
  */
 libze_error
 libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
@@ -939,7 +958,8 @@ libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ..
  * @brief Convenience function to set no memory error message
  * @param[in,out] initialized lzeh libze handle
  * @return @p LIBZE_ERROR_NOMEM
- * @invariant @p lzeh != NULL
+ *
+ * @pre @p lzeh != NULL
  */
 libze_error
 libze_error_nomem(libze_handle *lzeh) {
