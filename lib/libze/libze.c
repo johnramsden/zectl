@@ -478,6 +478,17 @@ err:
     return ret;
 }
 
+/**
+ * @brief Destroy a boot environment
+ * @param lzeh Initialized @p libze_handle
+ * @param options Destroy options
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN If the requested environment to destroy is too long,
+ *         @p LIBZE_ERROR_UNKNOWN If the environment is active,
+ *         @p LIBZE_ERROR_EEXIST If the environment doesn't exist,
+ *         @p LIBZE_ERROR_ZFS_OPEN If the dataset couldn't be opened,
+ *         @p LIBZE_ERROR_PLUGIN If the plugin hook failed
+ */
 libze_error
 libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
@@ -784,7 +795,7 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
                 options->be_name, ZFS_MAX_DATASET_NAME_LEN);
     }
 
-    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) {
+    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) { // NOLINT(hicpp-signed-bitwise)
         return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
                 "Boot environment %s does not exist\n", options->be_name);
     }
@@ -794,7 +805,7 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
         return LIBZE_ERROR_PLUGIN;
     }
 
-    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET);
+    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET); // NOLINT(hicpp-signed-bitwise)
     if (be_zh == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
                 "Failed opening dataset %s\n", be_ds_buff);
@@ -936,6 +947,7 @@ err:
  *
  * @pre @p lzeh != NULL
  * @pre if @p lze_fmt == NULL, @p ... should have zero arguments.
+ * @pre Length of formatted string < @p LIBZE_MAXPATHLEN
  */
 libze_error
 libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
@@ -947,17 +959,19 @@ libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ..
         strlcpy(lzeh->libze_err, "", LIBZE_MAXPATHLEN);
         return lze_err;
     }
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wuninitialized"
     va_list argptr;
     va_start(argptr, lze_fmt);
-    // TODO: Check too long?
     int length = vsnprintf(lzeh->libze_err, LIBZE_MAXPATHLEN, lze_fmt, argptr);
     va_end(argptr);
+#pragma clang diagnostic pop
 
-            assert(length < LIBZE_MAXPATHLEN);
+    assert(length < LIBZE_MAXPATHLEN);
 
     return lze_err;
 }
+
 
 /**
  * @brief Convenience function to set no memory error message
