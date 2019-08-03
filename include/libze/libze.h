@@ -64,9 +64,6 @@ libze_fini(libze_handle *);
 libze_error
 libze_list(libze_handle *lzeh, nvlist_t **outnvl);
 
-void
-libze_list_free(nvlist_t *nvl);
-
 libze_error
 libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suffix[static 1], char be[static 1],
             boolean_t recursive);
@@ -108,11 +105,6 @@ libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options);
 libze_error
 libze_destroy(libze_handle *lzeh, libze_destroy_options *options);
-
-boolean_t
-libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]);
-boolean_t
-libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]);
 
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]);

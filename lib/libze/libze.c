@@ -7,7 +7,6 @@
 #include "libze/libze_plugin_manager.h"
 #include "libze/libze.h"
 #include "libze/libze_util.h"
-#include "system_linux.h"
 
 // Unsigned long long is 64 bits or more
 #define ULL_SIZE 128
@@ -15,68 +14,146 @@
 const char *ZE_PROP_NAMESPACE = "org.zectl";
 
 /**
- * @brief Get the root dataset
- * @param[in] lzeh Initialized @p libze_handle
- * @return Non-zero on success
+ * @brief Filter out boot environment properties based on name of program namespace
+ * @param[in] unfiltered_nvl @p nvlist_t to filter based on namespace
+ * @param[out] result_nvl Filtered @p nvlist_t continuing only properties matching namespace
+ * @param namespace Prefix property to filter based on
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_UNKNOWN on failure.
  *
- * @pre lzeh != NULL
+ * @pre @p unfiltered_nvl != NULL
+ * @pre @p namespace != NULL
  */
-int
-libze_get_root_dataset(libze_handle *lzeh) {
-    zfs_handle_t *zh;
-    int ret = 0;
+static libze_error
+libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
+                      const char namespace[static 1]) {
+    nvpair_t *pair = NULL;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    char rootfs[LIBZE_MAXPATHLEN];
+    for (pair = nvlist_next_nvpair(unfiltered_nvl, NULL); pair != NULL;
+         pair = nvlist_next_nvpair(unfiltered_nvl, pair)) {
+        char *nvp_name = nvpair_name(pair);
+        char buf[LIBZE_MAXPATHLEN];
 
-    // Make sure type is ZFS
-    if (libze_dataset_from_mountpoint("/", LIBZE_MAXPATHLEN, rootfs) != SYSTEM_ERR_SUCCESS) {
-        return -1;
+        if (libze_util_cut(nvp_name, LIBZE_MAXPATHLEN, buf, ':') != 0) {
+            return LIBZE_ERROR_UNKNOWN;
+        }
+
+        if (strcmp(buf, namespace) == 0) {
+            nvlist_add_nvpair(*result_nvl, pair);
+        }
     }
 
-    if ((zh = zfs_path_to_zhandle(lzeh->lzh, "/", ZFS_TYPE_FILESYSTEM)) == NULL) {
-        return -1;
-    }
-
-    if (strlcpy(lzeh->rootfs, zfs_get_name(zh), LIBZE_MAXPATHLEN) >= LIBZE_MAXPATHLEN) {
-        ret = -1;
-    }
-
-    zfs_close(zh);
     return ret;
 }
 
 /**
- * @brief @p libze_handle cleanup.
- * @param lzeh @p libze_handle to de-allocate and close resources on.
+ * @brief Get all the ZFS properties which have been set with the @p namespace prefix
+ *        and return them in @a result.
  *
- * @post @p lzeh->lzh is closed
- * @post @p lzeh->lzph is closed
- * @post @p lzeh->ze_props is free'd
- * @post @p lzeh is free'd
+ *        Properties in form:
+ * @verbatim
+   org.zectl:bootloader:
+       value: 'systemdboot'
+       source: 'zroot/ROOT'
+   @endverbatim
+ *
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[out] result Properties of boot environment
+ * @param[in] namespace ZFS property prefix
+ * @return LIBZE_ERROR_SUCCESS on success, or
+ *         LIBZE_ERROR_ZFS_OPEN, LIBZE_ERROR_UNKNOWN, LIBZE_ERROR_NOMEM
+ *
+ * @pre @p lzeh != NULL
+ * @pre @p namespace != NULL
  */
-void
-libze_fini(libze_handle *lzeh) {
+libze_error
+libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]) {
+    nvlist_t *user_props = NULL;
+    nvlist_t *filtered_user_props = NULL;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    zfs_handle_t *zhp = zfs_open(lzeh->lzh, lzeh->be_root, ZFS_TYPE_FILESYSTEM);
+    if (zhp == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed opening handle to %s.\n", lzeh->be_root);
+    }
+
+    if ((user_props = zfs_get_user_props(zhp)) == NULL) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to retieve user properties for %s.\n", zfs_get_name(zhp));
+        goto err;
+    }
+
+    if ((filtered_user_props = fnvlist_alloc()) == NULL) {
+        ret = libze_error_nomem(lzeh);
+        goto err;
+    }
+
+    if ((ret = libze_filter_be_props(user_props, &filtered_user_props, namespace))
+        != LIBZE_ERROR_SUCCESS) {
+        goto err;
+    }
+
+    zfs_close(zhp);
+    *result = filtered_user_props;
+    return ret;
+err:
+    zfs_close(zhp);
+    fnvlist_free(user_props);
+    fnvlist_free(filtered_user_props);
+    return ret;
+}
+
+/**
+ * @brief Set an error message to @p lzeh->libze_err and return the error type
+ *        given in @p lze_err.
+ * @param[in,out] initialized lzeh libze handle
+ * @param[in] lze_err Error value returned
+ * @param[in] lze_fmt Format specifier used by @p lzeh
+ * @param ... Variable args used to format the error message saved in @p lzeh
+ * @return @p lze_err
+ *
+ * @pre @p lzeh != NULL
+ * @pre if @p lze_fmt == NULL, @p ... should have zero arguments.
+ * @pre Length of formatted string < @p LIBZE_MAXPATHLEN
+ */
+libze_error
+libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
     if (lzeh == NULL) {
-        return;
+        return lze_err;
     }
 
-    if (lzeh->lzh != NULL) {
-        libzfs_fini(lzeh->lzh);
-        lzeh->lzh = NULL;
+    if (lze_fmt == NULL) {
+        strlcpy(lzeh->libze_err, "", LIBZE_MAXPATHLEN);
+        return lze_err;
     }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wuninitialized"
+    va_list argptr;
+    va_start(argptr, lze_fmt);
+    int length = vsnprintf(lzeh->libze_err, LIBZE_MAXPATHLEN, lze_fmt, argptr);
+    va_end(argptr);
+#pragma clang diagnostic pop
 
-    if (lzeh->lzph != NULL) {
-        zpool_close(lzeh->lzph);
-        lzeh->lzph = NULL;
+            assert(length < LIBZE_MAXPATHLEN);
+
+    return lze_err;
+}
+
+/**
+ * @brief Convenience function to set no memory error message
+ * @param[in,out] initialized lzeh libze handle
+ * @return @p LIBZE_ERROR_NOMEM
+ *
+ * @pre @p lzeh != NULL
+ */
+libze_error
+libze_error_nomem(libze_handle *lzeh) {
+    if (lzeh == NULL) {
+        return LIBZE_ERROR_NOMEM;
     }
-
-    if (lzeh->ze_props != NULL) {
-        fnvlist_free(lzeh->ze_props);
-        lzeh->ze_props = NULL;
-    }
-
-    free(lzeh);
-    lzeh = NULL;
+    return libze_error_set(lzeh, LIBZE_ERROR_NOMEM, "Failed to allocate memory.\n");
 }
 
 /**
@@ -134,6 +211,11 @@ check_for_bootloader(libze_handle *lzeh) {
 
     return ret;
 }
+
+
+/********************************************************
+ ************** libze initialize / destroy **************
+ ********************************************************/
 
 /**
  * @brief Initialize libze handle.
@@ -205,6 +287,44 @@ err:
     if (zpool != NULL) { free(zpool); }
     return NULL;
 }
+
+/**
+ * @brief @p libze_handle cleanup.
+ * @param lzeh @p libze_handle to de-allocate and close resources on.
+ *
+ * @post @p lzeh->lzh is closed
+ * @post @p lzeh->lzph is closed
+ * @post @p lzeh->ze_props is free'd
+ * @post @p lzeh is free'd
+ */
+void
+libze_fini(libze_handle *lzeh) {
+    if (lzeh == NULL) {
+        return;
+    }
+
+    if (lzeh->lzh != NULL) {
+        libzfs_fini(lzeh->lzh);
+        lzeh->lzh = NULL;
+    }
+
+    if (lzeh->lzph != NULL) {
+        zpool_close(lzeh->lzph);
+        lzeh->lzph = NULL;
+    }
+
+    if (lzeh->ze_props != NULL) {
+        fnvlist_free(lzeh->ze_props);
+        lzeh->ze_props = NULL;
+    }
+
+    free(lzeh);
+    lzeh = NULL;
+}
+
+/**********************************
+ ************** list **************
+ **********************************/
 
 typedef struct libze_list_cbdata {
     nvlist_t **outnvl;
@@ -350,36 +470,9 @@ err:
     return ret;
 }
 
-/**
- * @brief Free nested nvlist one level down.
- * @param nvl @p nvlist_t to free
- */
-static void
-libze_free_children_nvl(nvlist_t *nvl) {
-
-    if (nvl == NULL) {
-        return;
-    }
-
-    nvpair_t *pair = NULL;
-    for (pair = nvlist_next_nvpair(nvl, NULL); pair != NULL;
-         pair = nvlist_next_nvpair(nvl, pair)) {
-        nvlist_t *ds_props = NULL;
-        nvpair_value_nvlist(pair, &ds_props);
-        fnvlist_free(ds_props);
-    }
-
-    nvlist_free(nvl);
-}
-
-/**
- * @brief Free an nvlist and one level down of it's children
- * @param[in] nvl nvlist to free
- */
-void
-libze_list_free(nvlist_t *nvl) {
-    libze_free_children_nvl(nvl);
-}
+/***********************************
+ ************** clone **************
+ ***********************************/
 
 typedef struct libze_clone_prop_cbdata {
     libze_handle *lzeh;
@@ -475,53 +568,6 @@ libze_clone_cb(zfs_handle_t *zhdl, void *data) {
     return ret;
 err:
     fnvlist_free(props);
-    return ret;
-}
-
-/**
- * @brief Destroy a boot environment
- * @param lzeh Initialized @p libze_handle
- * @param options Destroy options
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_MAXPATHLEN If the requested environment to destroy is too long,
- *         @p LIBZE_ERROR_UNKNOWN If the environment is active,
- *         @p LIBZE_ERROR_EEXIST If the environment doesn't exist,
- *         @p LIBZE_ERROR_ZFS_OPEN If the dataset couldn't be opened,
- *         @p LIBZE_ERROR_PLUGIN If the plugin hook failed
- */
-libze_error
-libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if (libze_util_concat(lzeh->be_root, "/", options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested boot environment %s exceeds max length %d\n",
-                options->be_name, ZFS_MAX_DATASET_NAME_LEN);
-    }
-
-    // TODO
-    if (libze_is_active_be(lzeh, be_ds_buff)) {
-
-    }
-
-    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Boot environment %s does not exist\n", options->be_name);
-    }
-
-    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET);
-    if (be_zh == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Failed opening dataset %s\n", be_ds_buff);
-    }
-
-
-    if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_destroy(lzeh, options->be_name) != 0)) {
-        return LIBZE_ERROR_PLUGIN;
-    }
-
-
     return ret;
 }
 
@@ -632,32 +678,65 @@ libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suf
     }
 
 err:
-    libze_free_children_nvl(cdata);
+    libze_list_free(cdata);
     zfs_close(zroot_hdl);
     return ret;
 }
 
-/**
- * @brief Check if boot environment is active
- * @param[in] lzeh Initialized @p libze_handle
- * @param[in] be_dataset Dataset to check if active
- * @return @p B_TRUE if active else @p B_FALSE
- */
-boolean_t
-libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]) {
-    return ((strcmp(lzeh->bootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
-}
+/*************************************
+ ************** destroy **************
+ *************************************/
 
 /**
- * @brief Check if boot environment is root dataset
- * @param[in] lzeh Initialized @p libze_handle
- * @param[in] be_dataset Dataset to check if root dataset
- * @return @p B_TRUE if active else @p B_FALSE
+ * @brief Destroy a boot environment
+ * @param lzeh Initialized @p libze_handle
+ * @param options Destroy options
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN If the requested environment to destroy is too long,
+ *         @p LIBZE_ERROR_UNKNOWN If the environment is active,
+ *         @p LIBZE_ERROR_EEXIST If the environment doesn't exist,
+ *         @p LIBZE_ERROR_ZFS_OPEN If the dataset couldn't be opened,
+ *         @p LIBZE_ERROR_PLUGIN If the plugin hook failed
  */
-boolean_t
-libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]) {
-    return ((strcmp(lzeh->rootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
+libze_error
+libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat(lzeh->be_root, "/", options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested boot environment %s exceeds max length %d\n",
+                options->be_name, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    // TODO
+    if (libze_is_active_be(lzeh, be_ds_buff)) {
+
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Boot environment %s does not exist\n", options->be_name);
+    }
+
+    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET);
+    if (be_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Failed opening dataset %s\n", be_ds_buff);
+    }
+
+
+    if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_destroy(lzeh, options->be_name) != 0)) {
+        return LIBZE_ERROR_PLUGIN;
+    }
+
+
+    return ret;
 }
+
+/**************************************
+ ************** activate **************
+ **************************************/
 
 typedef struct libze_activate_cbdata {
     libze_handle *lzeh;
@@ -852,151 +931,6 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
 err:
     zfs_close(be_zh);
     return ret;
-}
-
-/**
- * @brief Filter out food environment properties based on name of program namespace
- * @param[in] unfiltered_nvl @p nvlist_t to filter based on namespace
- * @param[out] result_nvl Filtered @p nvlist_t continuing only properties matching namespace
- * @param namespace Prefix property to filter based on
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_UNKNOWN on failure.
- *
- * @pre @p unfiltered_nvl != NULL
- * @pre @p namespace != NULL
- */
-static libze_error
-libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
-        const char namespace[static 1]) {
-    nvpair_t *pair = NULL;
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    for (pair = nvlist_next_nvpair(unfiltered_nvl, NULL); pair != NULL;
-         pair = nvlist_next_nvpair(unfiltered_nvl, pair)) {
-        char *nvp_name = nvpair_name(pair);
-        char buf[LIBZE_MAXPATHLEN];
-
-        if (libze_util_cut(nvp_name, LIBZE_MAXPATHLEN, buf, ':') != 0) {
-            return LIBZE_ERROR_UNKNOWN;
-        }
-
-        if (strcmp(buf, namespace) == 0) {
-            nvlist_add_nvpair(*result_nvl, pair);
-        }
-    }
-
-    return ret;
-}
-
-/**
- * @brief Get all the ZFS properties which have been set with the @p namespace prefix
- *        and return them in @a result.
- *
- *        Properties in form:
- * @verbatim
-   org.zectl:bootloader:
-       value: 'systemdboot'
-       source: 'zroot/ROOT'
-   @endverbatim
- *
- * @param[in] lzeh Initialized lzeh libze handle
- * @param[out] result Properties of boot environment
- * @param[in] namespace ZFS property prefix
- * @return LIBZE_ERROR_SUCCESS on success, or
- *         LIBZE_ERROR_ZFS_OPEN, LIBZE_ERROR_UNKNOWN, LIBZE_ERROR_NOMEM
- *
- * @pre @p lzeh != NULL
- * @pre @p namespace != NULL
- */
-libze_error
-libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]) {
-    nvlist_t *user_props = NULL;
-    nvlist_t *filtered_user_props = NULL;
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    zfs_handle_t *zhp = zfs_open(lzeh->lzh, lzeh->be_root, ZFS_TYPE_FILESYSTEM);
-    if (zhp == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed opening handle to %s.\n", lzeh->be_root);
-    }
-
-    if ((user_props = zfs_get_user_props(zhp)) == NULL) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed to retieve user properties for %s.\n", zfs_get_name(zhp));
-        goto err;
-    }
-
-    if ((filtered_user_props = fnvlist_alloc()) == NULL) {
-        ret = libze_error_nomem(lzeh);
-        goto err;
-    }
-
-    if ((ret = libze_filter_be_props(user_props, &filtered_user_props, namespace))
-        != LIBZE_ERROR_SUCCESS) {
-        goto err;
-    }
-
-    zfs_close(zhp);
-    *result = filtered_user_props;
-    return ret;
-err:
-    zfs_close(zhp);
-    fnvlist_free(user_props);
-    fnvlist_free(filtered_user_props);
-    return ret;
-}
-
-
-/**
- * @brief Set an error message to @p lzeh->libze_err and return the error type
- *        given in @p lze_err.
- * @param[in,out] initialized lzeh libze handle
- * @param[in] lze_err Error value returned
- * @param[in] lze_fmt Format specifier used by @p lzeh
- * @param ... Variable args used to format the error message saved in @p lzeh
- * @return @p lze_err
- *
- * @pre @p lzeh != NULL
- * @pre if @p lze_fmt == NULL, @p ... should have zero arguments.
- * @pre Length of formatted string < @p LIBZE_MAXPATHLEN
- */
-libze_error
-libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
-    if (lzeh == NULL) {
-        return lze_err;
-    }
-
-    if (lze_fmt == NULL) {
-        strlcpy(lzeh->libze_err, "", LIBZE_MAXPATHLEN);
-        return lze_err;
-    }
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wuninitialized"
-    va_list argptr;
-    va_start(argptr, lze_fmt);
-    int length = vsnprintf(lzeh->libze_err, LIBZE_MAXPATHLEN, lze_fmt, argptr);
-    va_end(argptr);
-#pragma clang diagnostic pop
-
-    assert(length < LIBZE_MAXPATHLEN);
-
-    return lze_err;
-}
-
-
-/**
- * @brief Convenience function to set no memory error message
- * @param[in,out] initialized lzeh libze handle
- * @return @p LIBZE_ERROR_NOMEM
- *
- * @pre @p lzeh != NULL
- */
-libze_error
-libze_error_nomem(libze_handle *lzeh) {
-    if (lzeh == NULL) {
-        return LIBZE_ERROR_NOMEM;
-    }
-    return libze_error_set(lzeh, LIBZE_ERROR_NOMEM, "Failed to allocate memory.\n");
 }
 
 #ifdef UNUSED

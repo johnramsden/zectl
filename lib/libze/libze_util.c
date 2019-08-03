@@ -1,3 +1,5 @@
+#include "libze/libze.h"
+#include "system_linux.h"
 #include <string.h>
 
 /**
@@ -104,4 +106,78 @@ libze_boot_env_name(const char *dataset, size_t buflen, char buf[buflen]) {
     }
 
     return 0;
+}
+
+/**
+ * @brief Check if boot environment is active
+ * @param[in] lzeh Initialized @p libze_handle
+ * @param[in] be_dataset Dataset to check if active
+ * @return @p B_TRUE if active else @p B_FALSE
+ */
+boolean_t
+libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]) {
+    return ((strcmp(lzeh->bootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
+}
+
+/**
+ * @brief Check if boot environment is root dataset
+ * @param[in] lzeh Initialized @p libze_handle
+ * @param[in] be_dataset Dataset to check if root dataset
+ * @return @p B_TRUE if active else @p B_FALSE
+ */
+boolean_t
+libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]) {
+    return ((strcmp(lzeh->rootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
+}
+
+/**
+ * @brief Free an nvlist and one level down of it's children
+ * @param[in] nvl nvlist to free
+ */
+void
+libze_list_free(nvlist_t *nvl) {
+    if (nvl == NULL) {
+        return;
+    }
+
+    nvpair_t *pair = NULL;
+    for (pair = nvlist_next_nvpair(nvl, NULL); pair != NULL;
+         pair = nvlist_next_nvpair(nvl, pair)) {
+        nvlist_t *ds_props = NULL;
+        nvpair_value_nvlist(pair, &ds_props);
+        fnvlist_free(ds_props);
+    }
+
+    nvlist_free(nvl);
+}
+
+/**
+ * @brief Get the root dataset
+ * @param[in] lzeh Initialized @p libze_handle
+ * @return Non-zero on success
+ *
+ * @pre lzeh != NULL
+ */
+int
+libze_get_root_dataset(libze_handle *lzeh) {
+    zfs_handle_t *zh;
+    int ret = 0;
+
+    char rootfs[LIBZE_MAXPATHLEN];
+
+    // Make sure type is ZFS
+    if (libze_dataset_from_mountpoint("/", LIBZE_MAXPATHLEN, rootfs) != SYSTEM_ERR_SUCCESS) {
+        return -1;
+    }
+
+    if ((zh = zfs_path_to_zhandle(lzeh->lzh, "/", ZFS_TYPE_FILESYSTEM)) == NULL) {
+        return -1;
+    }
+
+    if (strlcpy(lzeh->rootfs, zfs_get_name(zh), LIBZE_MAXPATHLEN) >= LIBZE_MAXPATHLEN) {
+        ret = -1;
+    }
+
+    zfs_close(zh);
+    return ret;
 }

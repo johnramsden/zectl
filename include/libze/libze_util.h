@@ -30,4 +30,15 @@ libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char 
 int
 libze_util_suffix_after_string(const char root[static 1], const char dataset[static 1], size_t buflen, char buf[buflen]);
 
+int
+libze_get_root_dataset(libze_handle *lzeh);
+
+boolean_t
+libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]);
+boolean_t
+libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]);
+
+void
+libze_list_free(nvlist_t *nvl);
+
 #endif //ZECTL_LIBZE_UTIL_H
