@@ -62,16 +62,21 @@ libze_fini(libze_handle *lzeh) {
 
     if (lzeh->lzh != NULL) {
         libzfs_fini(lzeh->lzh);
+        lzeh->lzh = NULL;
     }
+
     if (lzeh->lzph != NULL) {
         zpool_close(lzeh->lzph);
+        lzeh->lzph = NULL;
     }
 
     if (lzeh->ze_props != NULL) {
         fnvlist_free(lzeh->ze_props);
+        lzeh->ze_props = NULL;
     }
 
     free(lzeh);
+    lzeh = NULL;
 }
 
 /**

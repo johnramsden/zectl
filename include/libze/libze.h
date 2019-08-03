@@ -26,6 +26,17 @@ typedef enum libze_error {
 typedef struct libze_handle libze_handle;
 typedef struct libze_plugin_fn_export libze_plugin_fn_export;
 
+/**
+ * @brief libze handle used for majority of libze functions.
+ *
+ * @invariant if initialized with libze_init:
+ *            (lzh != NULL) && (lzph != NULL) && (ze_props != NULL) &&
+ *            (strlen(be_root) >= 1) && (strlen(rootfs) >= 3) &&
+ *            (strlen(bootfs) >= 3) && (strlen(zpool) >= 1)
+ * @invariant If closed with libze_fini:
+ *            lzh, lzph are closed and NULL
+ *            ze_props has been free'd and is NULL
+ */
 struct libze_handle {
     libzfs_handle_t *lzh;
     zpool_handle_t *lzph;
@@ -95,9 +106,13 @@ typedef struct libze_destroy_options {
 
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options);
+libze_error
+libze_destroy(libze_handle *lzeh, libze_destroy_options *options);
 
 boolean_t
-libze_is_active_be(libze_handle *lzeh, char be[static 1]);
+libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]);
+boolean_t
+libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]);
 
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]);
