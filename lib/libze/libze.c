@@ -641,11 +641,22 @@ err:
  * @brief Check if boot environment is active
  * @param[in] lzeh Initialized @p libze_handle
  * @param[in] be_dataset Dataset to check if active
- * @return @p B_TRUE if active, @p B_FALSE otherwise.
+ * @return @p B_TRUE if active else @p B_FALSE
  */
 boolean_t
-libze_is_active_be(libze_handle *lzeh, char be_dataset[static 1]) {
+libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]) {
     return ((strcmp(lzeh->bootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
+}
+
+/**
+ * @brief Check if boot environment is root dataset
+ * @param[in] lzeh Initialized @p libze_handle
+ * @param[in] be_dataset Dataset to check if root dataset
+ * @return @p B_TRUE if active else @p B_FALSE
+ */
+boolean_t
+libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]) {
+    return ((strcmp(lzeh->rootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
 }
 
 typedef struct libze_activate_cbdata {
@@ -708,7 +719,7 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
     libze_error ret = LIBZE_ERROR_SUCCESS;
     char *tmp_dirname = "/";
     const char *ds_name = zfs_get_name(be_zh);
-    boolean_t is_root = B_TRUE;
+    boolean_t is_root = libze_is_root_be(lzeh, ds_name);
 
     nvlist_t *props = fnvlist_alloc();
     if (props == NULL) {
@@ -716,8 +727,7 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
     }
     nvlist_add_string(props, "canmount", "noauto");
 
-    if (strcmp(lzeh->rootfs, ds_name) != 0) {
-        is_root = B_FALSE;
+    if (is_root) {
         nvlist_add_string(props, "mountpoint", "/");
 
         // Not currently mounted
@@ -856,8 +866,9 @@ err:
  * @pre @p namespace != NULL
  */
 static libze_error
-libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl, const char namespace[static 1]) {
-    nvpair_t *pair;
+libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
+        const char namespace[static 1]) {
+    nvpair_t *pair = NULL;
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
     for (pair = nvlist_next_nvpair(unfiltered_nvl, NULL); pair != NULL;
