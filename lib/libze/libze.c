@@ -192,7 +192,8 @@ check_for_bootloader(libze_handle *lzeh) {
 
     void *p_handle = libze_plugin_open(plugin);
     if (p_handle == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_PLUGIN, "Failed to open plugin %s\n", plugin);
+        return libze_error_set(lzeh, LIBZE_ERROR_PLUGIN,
+                "Failed to open plugin %s\n", plugin);
     } else {
         if (libze_plugin_export(p_handle, &lzeh->lz_funcs) != 0) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN,
@@ -687,6 +688,57 @@ err:
  ************** destroy **************
  *************************************/
 
+typedef struct libze_destroy_cbdata {
+    libze_handle *lzeh;
+    libze_destroy_options *options;
+} libze_destroy_cbdata;
+
+static int
+libze_destroy_cb(zfs_handle_t *zh, void *data) {
+    int ret = 0;
+    libze_destroy_cbdata *cbd = data;
+
+    const char *ds = zfs_get_name(zh);
+    if (zfs_is_mounted(zh, NULL) && cbd->options->force) {
+        zfs_unmount(zh, NULL, 0);
+    } else {
+        return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Dataset %s is mounted, run with force or unmount dataset\n", ds);
+    }
+
+    // Check if clone, origin snapshot saved to buffer
+    char buf[LIBZE_MAXPATHLEN];
+    if (zfs_prop_get(zh, ZFS_PROP_ORIGIN, buf, sizeof(buf), NULL, NULL, 0, 1) == 0) {
+        // Is a clone, continue
+        if (cbd->options->destroy_origin) {
+            // Destroy origin snapshot
+            zfs_handle_t *origin_h = zfs_open(cbd->lzeh->lzh, buf, ZFS_TYPE_SNAPSHOT);
+            if (origin_h != NULL) {
+                if (zfs_destroy(origin_h, B_FALSE) != 0) {
+                    zfs_close(origin_h);
+                    return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                            "Failed to destroy origin snapshot %s\n", buf);
+                }
+            }
+            zfs_close(origin_h);
+        }
+        // TODO: If dependent clones exist, should we promote them? Not sure if that ever occurs.
+    }
+
+    // Destroy children recursively
+    if (zfs_iter_children(zh, libze_destroy_cb, cbd) != 0) {
+        return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to iterate over children of %s\n", ds);
+    }
+    // Destroy dataset
+    if (zfs_destroy(zh, B_FALSE) != 0) {
+        return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to destroy dataset %s\n", ds);
+    }
+
+    return ret;
+}
+
 /**
  * @brief Destroy a boot environment
  * @param lzeh Initialized @p libze_handle
@@ -709,28 +761,62 @@ libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
                 options->be_name, ZFS_MAX_DATASET_NAME_LEN);
     }
 
-    // TODO
     if (libze_is_active_be(lzeh, be_ds_buff)) {
-
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Cannot destroy active boot environment %s\n", options->be_name);
+    }
+    if (libze_is_root_be(lzeh, be_ds_buff)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Cannot destroy root boot environment %s\n", options->be_name);
     }
 
-    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) {
+    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) { // NOLINT(hicpp-signed-bitwise)
         return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
                 "Boot environment %s does not exist\n", options->be_name);
     }
 
-    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET);
-    if (be_zh == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Failed opening dataset %s\n", be_ds_buff);
-    }
+    zfs_handle_t *be_zh = NULL;
 
+    if ((strchr(be_ds_buff, '@') != NULL)) { // Is snapshot
+        if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_SNAPSHOT)) {
+            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                    "Snapshot %s does not exist\n", be_ds_buff);
+        }
+//        be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_SNAPSHOT);
+        // TODO
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Snapshot destroy not implemented\n");
+
+    } else { // Is dataset or clone
+        if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_FILESYSTEM)) {
+            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                    "Dataset %s does not exist\n", be_ds_buff);
+        }
+
+        be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_FILESYSTEM);
+        if (be_zh == NULL) {
+            return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                    "Failed opening dataset %s\n", be_ds_buff);
+        }
+
+        libze_destroy_cbdata cbd = {
+                .lzeh = lzeh,
+                .options = options
+        };
+
+        if (libze_destroy_cb(be_zh, &cbd) != 0) {
+            goto err;
+        }
+    }
 
     if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_destroy(lzeh, options->be_name) != 0)) {
         return LIBZE_ERROR_PLUGIN;
     }
 
-
+err:
+    if (be_zh != NULL) {
+        zfs_close(be_zh);
+    }
     return ret;
 }
 

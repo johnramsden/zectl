@@ -15,12 +15,19 @@ void
 ze_usage(void);
 
 libze_error
-ze_list(libze_handle *lzeh, int argc, char **argv);
+ze_activate(libze_handle *lzeh, int argc, char **argv);
 
 libze_error
 ze_create(libze_handle *lzeh, int argc, char **argv);
 
 libze_error
-ze_activate(libze_handle *lzeh, int argc, char **argv);
+ze_destroy(libze_handle *lzeh, int argc, char **argv);
+
+libze_error
+ze_list(libze_handle *lzeh, int argc, char **argv);
+
+
+
+
 
 #endif //ZECTL_ZECTL_H

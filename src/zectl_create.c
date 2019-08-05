@@ -24,7 +24,8 @@ pre_create_be_clone(libze_handle *lzeh, create_be_clone_t *create_clone) {
     // Check length before calling 'create_be_clone'
     // +2 for '@' and '\0'
     if ((strlen(lzeh->bootfs)+strlen(create_clone->be_clone_snap_suffix)+2) > ZFS_MAX_DATASET_NAME_LEN) {
-        fprintf(stderr, "%s%s%s%s", "Dataset name ", lzeh->bootfs, create_clone->be_clone_snap_suffix, " is too long");
+        fprintf(stderr, "%s%s%s%s", "Dataset name ", lzeh->bootfs,
+                create_clone->be_clone_snap_suffix," is too long");
         return LIBZE_ERROR_UNKNOWN;
     }
 

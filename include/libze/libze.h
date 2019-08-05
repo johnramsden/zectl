@@ -100,6 +100,8 @@ typedef struct libze_activate_options {
 typedef struct libze_destroy_options {
     char *be_name;
     boolean_t noconfirm;
+    boolean_t destroy_origin;
+    boolean_t force;
 } libze_destroy_options;
 
 libze_error
