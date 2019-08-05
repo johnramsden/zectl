@@ -27,7 +27,8 @@ typedef struct libze_handle libze_handle;
 typedef struct libze_plugin_fn_export libze_plugin_fn_export;
 
 /**
- * @brief libze handle used for majority of libze functions.
+ * @struct libze handle
+ * @brief Used for majority of libze functions.
  *
  * @invariant if initialized with libze_init:
  *            (lzh != NULL) && (lzph != NULL) && (ze_props != NULL) &&
@@ -38,15 +39,15 @@ typedef struct libze_plugin_fn_export libze_plugin_fn_export;
  *            ze_props has been free'd and is NULL
  */
 struct libze_handle {
-    libzfs_handle_t *lzh;
-    zpool_handle_t *lzph;
-    char be_root[LIBZE_MAXPATHLEN];
-    char rootfs[LIBZE_MAXPATHLEN];
-    char bootfs[LIBZE_MAXPATHLEN];
-    char zpool[LIBZE_MAXPATHLEN];
-    libze_plugin_fn_export *lz_funcs;
-    nvlist_t *ze_props;
-    char libze_err[LIBZE_MAXPATHLEN];
+    libzfs_handle_t *lzh;              /**< Handle to libzfs                   */
+    zpool_handle_t *lzph;              /**< Handle to current zpool            */
+    char be_root[LIBZE_MAXPATHLEN];    /**< Dataset root of boot environments  */
+    char rootfs[LIBZE_MAXPATHLEN];     /**< Root dataset (current mounted '/') */
+    char bootfs[LIBZE_MAXPATHLEN];     /**< Dataset set to bootfs              */
+    char zpool[LIBZE_MAXPATHLEN];      /**< ZFS pool name                      */
+    libze_plugin_fn_export *lz_funcs;  /**< Pointer to bootloader plugin       */
+    nvlist_t *ze_props;                /**< User org.zectl properties          */
+    char libze_err[LIBZE_MAXPATHLEN];  /**< Last error buffer                  */
 };
 
 typedef struct libze_clone_cbdata {
