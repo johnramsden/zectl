@@ -52,7 +52,7 @@ libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char 
 /**
  * @brief Given a dataset, return just the portion after the root of boot environments
  * @param[in] root Root of boot environments
- * @param[in] dataset Full beta set to get suffix of
+ * @param[in] dataset Full dataset to get suffix of
  * @param[in] buflen Length of buffer
  * @param[out] buf Buffer to place suffix in
  * @return Non-zero if there is no parent (path is just the name of the pool),
