@@ -740,6 +740,101 @@ libze_destroy_cb(zfs_handle_t *zh, void *data) {
 }
 
 /**
+ * @brief Destroy a boot environment clone or dataset
+ * @param lzeh Initialized @p libze_handle
+ * @param options Destroy options
+ * @param filesystem Clone or boot environment full name
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_ZFS_OPEN if @p filesystem can't be opened,
+ *         @p LIBZE_ERROR_EEXIST if @p filesystem doesnt exist,
+ */
+static libze_error
+destroy_filesystem(libze_handle *lzeh, libze_destroy_options *options,
+                 const char filesystem[ZFS_MAX_DATASET_NAME_LEN]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    if (!zfs_dataset_exists(lzeh->lzh, filesystem, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Dataset %s does not exist\n", filesystem);
+    }
+    zfs_handle_t *be_zh = NULL;
+    be_zh = zfs_open(lzeh->lzh, filesystem, ZFS_TYPE_FILESYSTEM);
+    if (be_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Failed opening dataset %s\n", filesystem);
+    }
+
+    libze_destroy_cbdata cbd = {
+            .lzeh = lzeh,
+            .options = options
+    };
+
+    if (libze_destroy_cb(be_zh, &cbd) != 0) {
+        ret = LIBZE_ERROR_UNKNOWN;
+    }
+    zfs_close(be_zh);
+
+    return ret;
+}
+
+/**
+ * @brief Destroy a boot environment snapshot
+ * @param lzeh Initialized @p libze_handle
+ * @param options Destroy options
+ * @param snapshot Snapshot full name
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_ZFS_OPEN if @p snapshot dataset can't be opened,
+ *         @p LIBZE_ERROR_EEXIST if @p snapshot doesnt exist, or isnt a BE,
+ *         @p LIBZE_ERROR_MAXPATHLEN if snapshot name is too long
+ */
+static libze_error
+destroy_snapshot(libze_handle *lzeh, libze_destroy_options *options,
+        const char snapshot[ZFS_MAX_DATASET_NAME_LEN]) {
+    if (!zfs_dataset_exists(lzeh->lzh, snapshot, ZFS_TYPE_SNAPSHOT)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Snapshot %s does not exist\n", snapshot);
+    }
+    char be_snap_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_full_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+
+    // Get boot environment name, we know ZFS_MAX_DATASET_NAME_LEN wont be exceeded
+    (void) libze_util_cut(options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_snap_ds_buff, '@');
+
+    // Join BE name with BE root to verify requested snap is from a BE
+    if (libze_util_concat(lzeh->be_root, "/", be_snap_ds_buff,
+            ZFS_MAX_DATASET_NAME_LEN, be_full_ds) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested boot environment %s exceeds max length %d\n",
+                options->be_name, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    if (!zfs_name_valid(be_full_ds, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Invalid dataset %s\n", be_full_ds);
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, be_full_ds, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Dataset %s does not exist\n", be_full_ds);
+    }
+
+    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, snapshot, ZFS_TYPE_SNAPSHOT);
+    if (be_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Failed opening dataset %s\n", snapshot);
+    }
+
+    if (zfs_destroy(be_zh, B_FALSE) != 0) {
+        zfs_close(be_zh);
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Failed to destroy snapshot %s\n", snapshot);
+    }
+    zfs_close(be_zh);
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+/**
  * @brief Destroy a boot environment
  * @param lzeh Initialized @p libze_handle
  * @param options Destroy options
@@ -770,70 +865,14 @@ libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
                 "Cannot destroy root boot environment %s\n", options->be_name);
     }
 
-    if ((strchr(be_ds_buff, '@') != NULL)) { // Is snapshot
-        if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_SNAPSHOT)) {
-            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                    "Snapshot %s does not exist\n", be_ds_buff);
+    if ((strchr(be_ds_buff, '@') == NULL)) {
+        if ((ret = destroy_filesystem(lzeh, options, be_ds_buff)) != LIBZE_ERROR_SUCCESS) {
+            return ret;
         }
-        char be_snap_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
-        char be_full_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
-
-        // Get boot environment name, we know ZFS_MAX_DATASET_NAME_LEN wont be exceeded
-        (void) libze_util_cut(options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_snap_ds_buff, '@');
-
-        // Join BE name with BE root to verify requested snap is from a BE
-        if (libze_util_concat(lzeh->be_root, "/", be_snap_ds_buff,
-                ZFS_MAX_DATASET_NAME_LEN, be_full_ds) != 0) {
-            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                    "Requested boot environment %s exceeds max length %d\n",
-                    options->be_name, ZFS_MAX_DATASET_NAME_LEN);
+    } else {
+        if ((ret = destroy_snapshot(lzeh, options, be_ds_buff)) != LIBZE_ERROR_SUCCESS) {
+            return ret;
         }
-
-        if (!zfs_name_valid(be_full_ds, ZFS_TYPE_FILESYSTEM)) {
-            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                    "Invalid dataset %s\n", be_full_ds);
-        }
-
-        if (!zfs_dataset_exists(lzeh->lzh, be_full_ds, ZFS_TYPE_FILESYSTEM)) {
-            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                    "Dataset %s does not exist\n", be_full_ds);
-        }
-
-        zfs_handle_t *be_zh = NULL;
-        be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_SNAPSHOT);
-        if (be_zh == NULL) {
-            return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                    "Failed opening dataset %s\n", be_ds_buff);
-        }
-
-        if (zfs_destroy(be_zh, B_FALSE) != 0) {
-            zfs_close(be_zh);
-            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                    "Failed to destroy snapshot %s\n", be_ds_buff);
-        }
-        zfs_close(be_zh);
-    } else { // Is dataset or clone
-        if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_FILESYSTEM)) {
-            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                    "Dataset %s does not exist\n", be_ds_buff);
-        }
-        zfs_handle_t *be_zh = NULL;
-        be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_FILESYSTEM);
-        if (be_zh == NULL) {
-            return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                    "Failed opening dataset %s\n", be_ds_buff);
-        }
-
-        libze_destroy_cbdata cbd = {
-                .lzeh = lzeh,
-                .options = options
-        };
-
-        if (libze_destroy_cb(be_zh, &cbd) != 0) {
-            zfs_close(be_zh);
-            return LIBZE_ERROR_UNKNOWN;
-        }
-        zfs_close(be_zh);
     }
 
     if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_destroy(lzeh, options->be_name) != 0)) {
