@@ -123,4 +123,9 @@ libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ..
 libze_error
 libze_error_nomem(libze_handle *lzeh);
 
+libze_error
+libze_set_default_props(libze_handle *lzeh, nvlist_t *default_prop, const char namespace[static 1]);
+libze_error
+libze_add_default_prop(nvlist_t **prop_out, const char name[static 3], const char value[static 1],
+                       const char *namespace);
 #endif //ZECTL_LIBZE_H

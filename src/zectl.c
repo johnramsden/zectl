@@ -66,6 +66,31 @@ get_command(command_map_t *ze_command_map,
     return command;
 }
 
+/**
+ * @brief Helper function to set default proprrties
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @return 0 on success, nonzero on failure
+ *
+ */
+static int
+define_default_props(libze_handle *lzeh) {
+    nvlist_t *default_props = NULL;
+    if ((default_props = fnvlist_alloc()) == NULL) {
+        return -1;
+    }
+    if ((libze_add_default_prop(&default_props, "bootloader", "", ZE_PROP_NAMESPACE) != 0) ||
+        (libze_add_default_prop(&default_props, "bootpool", "", ZE_PROP_NAMESPACE) != 0)) {
+        return -1;
+    }
+
+    if (libze_set_default_props(lzeh, default_props, ZE_PROP_NAMESPACE) != 0) {
+        nvlist_free(default_props);
+        return -1;
+    }
+
+    return 0;
+}
+
 #define NUM_COMMANDS 4 // Will be 9
 
 int
@@ -115,8 +140,14 @@ main(int argc, char *argv[]) {
 //    }
 
     if ((lzeh = libze_init()) == NULL) {
-        printf("%s: System may not be configured correctly "
+        fprintf(stderr, "%s: System may not be configured correctly "
                "for boot environments\n", ZE_PROGRAM);
+        ret = EXIT_FAILURE;
+        goto fin;
+    }
+
+    if (define_default_props(lzeh) != 0) {
+        fprintf(stderr, "%s: Failed to set default propertiess\n", ZE_PROGRAM);
         ret = EXIT_FAILURE;
         goto fin;
     }

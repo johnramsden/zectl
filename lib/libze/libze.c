@@ -14,6 +14,119 @@
 const char *ZE_PROP_NAMESPACE = "org.zectl";
 
 /**
+ * @brief Add a default property
+ * @param[out] prop_out Output property list
+ * @param name Name of property without nameapace
+ * @param value Value of default property
+ * @param namespace Property namespace without colon
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_NOMEM if nvlist can't be duplicated,
+ *         @p LIBZE_ERROR_UNKNOWN otherwise
+ *
+ * Properties in form:
+ * @verbatim
+   org.zectl:bootloader:
+       value: 'systemdboot'
+       source: 'zroot/ROOT'
+   @endverbatim
+ */
+libze_error
+libze_add_default_prop(nvlist_t **prop_out, const char name[static 3], const char value[static 1],
+        const char *namespace) {
+    nvlist_t *default_prop = fnvlist_alloc();
+    if (default_prop == NULL) {
+        return LIBZE_ERROR_NOMEM;
+    }
+
+    if (nvlist_add_string(default_prop, "value", value) != 0) {
+        goto err;
+    }
+
+    char name_buf[ZFS_MAXPROPLEN] = "";
+    if (libze_util_concat(namespace, ":", name, ZFS_MAXPROPLEN, name_buf) != 0) {
+        goto err;
+    }
+
+    if (nvlist_add_nvlist(*prop_out, name_buf, default_prop) != 0) {
+        goto err;
+    }
+
+    return 0;
+
+err:
+    nvlist_free(default_prop);
+    return LIBZE_ERROR_UNKNOWN;
+}
+
+/**
+ * @brief Set default properties
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] default_prop Properties of boot environment
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_NOMEM if nvlist can't be duplicated,
+ *         @p LIBZE_ERROR_UNKNOWN otherwise
+ *
+ * @pre @p default_prop != NULL
+ * @pre @p namespace != NULL
+ */
+libze_error
+libze_set_default_props(libze_handle *lzeh, nvlist_t *default_prop,
+        const char namespace[static 1]) {
+    nvpair_t *pair = NULL;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    for (pair = nvlist_next_nvpair(default_prop, NULL); pair != NULL;
+         pair = nvlist_next_nvpair(default_prop, pair)) {
+
+        char *nvp_name = nvpair_name(pair);
+        char buf[LIBZE_MAXPATHLEN];
+
+        if (libze_util_cut(nvp_name, LIBZE_MAXPATHLEN, buf, ':') != 0) {
+            return LIBZE_ERROR_UNKNOWN;
+        }
+
+        if (strcmp(buf, namespace) != 0) {
+            continue;
+        }
+
+        // Check if property set
+        boolean_t ze_prop_unset = B_TRUE;
+        nvpair_t *ze_pair = NULL;
+        for (ze_pair = nvlist_next_nvpair(lzeh->ze_props, NULL); ze_pair != NULL;
+             ze_pair = nvlist_next_nvpair(lzeh->ze_props, ze_pair)) {
+            char *ze_nvp_name = nvpair_name(ze_pair);
+            if (strcmp(ze_nvp_name, nvp_name) == 0) {
+                ze_prop_unset = B_FALSE;
+                break;
+            }
+        }
+
+        // Property unset, set default
+        if (ze_prop_unset) {
+            nvlist_t *ze_default_prop_nvl = NULL;
+            nvlist_t *ze_prop_nvl = NULL;
+            if (nvpair_value_nvlist(pair, &ze_prop_nvl) != 0) {
+                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                        "Failed to get nvpair_value\n");
+            }
+
+            if (nvlist_dup(ze_prop_nvl, &ze_default_prop_nvl, 0) != 0) {
+                return libze_error_set(lzeh, LIBZE_ERROR_NOMEM,
+                        "Failed to duplicate nvlist\n");
+            }
+
+            if (nvlist_add_nvlist(lzeh->ze_props, nvp_name, ze_default_prop_nvl) != 0) {
+                return libze_error_set(lzeh, LIBZE_ERROR_NOMEM,
+                        "Failed to add default property %s\n", nvp_name);
+            }
+        }
+    }
+
+
+    return ret;
+}
+
+/**
  * @brief Filter out boot environment properties based on name of program namespace
  * @param[in] unfiltered_nvl @p nvlist_t to filter based on namespace
  * @param[out] result_nvl Filtered @p nvlist_t continuing only properties matching namespace
