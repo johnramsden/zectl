@@ -27,16 +27,20 @@ typedef struct libze_handle libze_handle;
 typedef struct libze_plugin_fn_export libze_plugin_fn_export;
 
 /**
- * @struct libze handle
+ * @struct libze_handle
  * @brief Used for majority of libze functions.
  *
- * @invariant if initialized with libze_init:
- *            (lzh != NULL) && (lzph != NULL) && (ze_props != NULL) &&
- *            (strlen(be_root) >= 1) && (strlen(rootfs) >= 3) &&
- *            (strlen(bootfs) >= 3) && (strlen(zpool) >= 1)
- * @invariant If closed with libze_fini:
- *            lzh, lzph are closed and NULL
- *            ze_props has been free'd and is NULL
+ * @invariant Initialized with libze_init:
+ * @invariant (lzh != NULL) && (lzph != NULL)
+ * @invariant ze_props != NULL
+ * @invariant strlen(be_root) >= 1
+ * @invariant strlen(rootfs) >= 3
+ * @invariant strlen(bootfs) >= 3
+ * @invariant strlen(zpool) >= 1
+ *
+ * @invariant Closed with libze_fini:
+ * @invariant lzh, lzph are closed and NULL
+ * @invariant ze_props has been free'd and is NULL
  */
 struct libze_handle {
     libzfs_handle_t *lzh;              /**< Handle to libzfs                   */
