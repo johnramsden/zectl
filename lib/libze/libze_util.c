@@ -163,10 +163,10 @@ libze_get_root_dataset(libze_handle *lzeh) {
     zfs_handle_t *zh;
     int ret = 0;
 
-    char rootfs[LIBZE_MAXPATHLEN];
+    char rootfs[ZFS_MAX_DATASET_NAME_LEN];
 
     // Make sure type is ZFS
-    if (libze_dataset_from_mountpoint("/", LIBZE_MAXPATHLEN, rootfs) != SYSTEM_ERR_SUCCESS) {
+    if (libze_dataset_from_mountpoint("/", ZFS_MAX_DATASET_NAME_LEN, rootfs) != SYSTEM_ERR_SUCCESS) {
         return -1;
     }
 
@@ -174,7 +174,7 @@ libze_get_root_dataset(libze_handle *lzeh) {
         return -1;
     }
 
-    if (strlcpy(lzeh->rootfs, zfs_get_name(zh), LIBZE_MAXPATHLEN) >= LIBZE_MAXPATHLEN) {
+    if (strlcpy(lzeh->rootfs, zfs_get_name(zh), ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
         ret = -1;
     }
 

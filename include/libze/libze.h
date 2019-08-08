@@ -7,7 +7,7 @@
 
 #include <libzfs/libzfs.h>
 
-#define LIBZE_MAXPATHLEN    512
+#define LIBZE_MAX_ERROR_LEN    1024
 
 extern const char *ZE_PROP_NAMESPACE;
 
@@ -43,15 +43,15 @@ typedef struct libze_plugin_fn_export libze_plugin_fn_export;
  * @invariant ze_props has been free'd and is NULL
  */
 struct libze_handle {
-    libzfs_handle_t *lzh;              /**< Handle to libzfs                   */
-    zpool_handle_t *lzph;              /**< Handle to current zpool            */
-    char be_root[LIBZE_MAXPATHLEN];    /**< Dataset root of boot environments  */
-    char rootfs[LIBZE_MAXPATHLEN];     /**< Root dataset (current mounted '/') */
-    char bootfs[LIBZE_MAXPATHLEN];     /**< Dataset set to bootfs              */
-    char zpool[LIBZE_MAXPATHLEN];      /**< ZFS pool name                      */
-    libze_plugin_fn_export *lz_funcs;  /**< Pointer to bootloader plugin       */
-    nvlist_t *ze_props;                /**< User org.zectl properties          */
-    char libze_err[LIBZE_MAXPATHLEN];  /**< Last error buffer                  */
+    libzfs_handle_t *lzh;                     /**< Handle to libzfs                   */
+    zpool_handle_t *lzph;                     /**< Handle to current zpool            */
+    char be_root[ZFS_MAX_DATASET_NAME_LEN];   /**< Dataset root of boot environments  */
+    char rootfs[ZFS_MAX_DATASET_NAME_LEN];    /**< Root dataset (current mounted '/') */
+    char bootfs[ZFS_MAX_DATASET_NAME_LEN];    /**< Dataset set to bootfs              */
+    char zpool[ZFS_MAX_DATASET_NAME_LEN];     /**< ZFS pool name                      */
+    libze_plugin_fn_export *lz_funcs;         /**< Pointer to bootloader plugin       */
+    nvlist_t *ze_props;                       /**< User org.zectl properties          */
+    char libze_err[LIBZE_MAX_ERROR_LEN];         /**< Last error buffer                  */
 };
 
 typedef struct libze_clone_cbdata {

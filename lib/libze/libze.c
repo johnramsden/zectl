@@ -51,7 +51,7 @@ libze_add_default_prop(nvlist_t **prop_out, const char name[static 3], const cha
         goto err;
     }
 
-    return 0;
+    return LIBZE_ERROR_SUCCESS;
 
 err:
     nvlist_free(default_prop);
@@ -79,9 +79,9 @@ libze_set_default_props(libze_handle *lzeh, nvlist_t *default_prop,
          pair = nvlist_next_nvpair(default_prop, pair)) {
 
         char *nvp_name = nvpair_name(pair);
-        char buf[LIBZE_MAXPATHLEN];
+        char buf[ZFS_MAXPROPLEN];
 
-        if (libze_util_cut(nvp_name, LIBZE_MAXPATHLEN, buf, ':') != 0) {
+        if (libze_util_cut(nvp_name, ZFS_MAXPROPLEN, buf, ':') != 0) {
             return LIBZE_ERROR_UNKNOWN;
         }
 
@@ -146,9 +146,9 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
     for (pair = nvlist_next_nvpair(unfiltered_nvl, NULL); pair != NULL;
          pair = nvlist_next_nvpair(unfiltered_nvl, pair)) {
         char *nvp_name = nvpair_name(pair);
-        char buf[LIBZE_MAXPATHLEN];
+        char buf[ZFS_MAXPROPLEN];
 
-        if (libze_util_cut(nvp_name, LIBZE_MAXPATHLEN, buf, ':') != 0) {
+        if (libze_util_cut(nvp_name, ZFS_MAXPROPLEN, buf, ':') != 0) {
             return LIBZE_ERROR_UNKNOWN;
         }
 
@@ -229,7 +229,7 @@ err:
  *
  * @pre @p lzeh != NULL
  * @pre if @p lze_fmt == NULL, @p ... should have zero arguments.
- * @pre Length of formatted string < @p LIBZE_MAXPATHLEN
+ * @pre Length of formatted string < @p LIBZE_MAX_ERROR_LEN
  */
 libze_error
 libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
@@ -238,18 +238,18 @@ libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ..
     }
 
     if (lze_fmt == NULL) {
-        strlcpy(lzeh->libze_err, "", LIBZE_MAXPATHLEN);
+        strlcpy(lzeh->libze_err, "", LIBZE_MAX_ERROR_LEN);
         return lze_err;
     }
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wuninitialized"
     va_list argptr;
     va_start(argptr, lze_fmt);
-    int length = vsnprintf(lzeh->libze_err, LIBZE_MAXPATHLEN, lze_fmt, argptr);
+    int length = vsnprintf(lzeh->libze_err, LIBZE_MAX_ERROR_LEN, lze_fmt, argptr);
     va_end(argptr);
 #pragma clang diagnostic pop
 
-            assert(length < LIBZE_MAXPATHLEN);
+    assert(length < LIBZE_MAX_ERROR_LEN);
 
     return lze_err;
 }
@@ -350,7 +350,7 @@ libze_init(void) {
     if (libze_get_root_dataset(lzeh) != 0) {
         goto err;
     }
-    if (libze_util_cut(lzeh->rootfs, LIBZE_MAXPATHLEN, lzeh->be_root, '/') != 0) {
+    if (libze_util_cut(lzeh->rootfs, ZFS_MAX_DATASET_NAME_LEN, lzeh->be_root, '/') != 0) {
         goto err;
     }
     if ((slashp = strchr(lzeh->be_root, '/')) == NULL) {
@@ -369,7 +369,7 @@ libze_init(void) {
     }
     zpool[pool_length] = '\0';
 
-    if (strlcpy(lzeh->zpool, zpool, LIBZE_MAXPATHLEN) >= LIBZE_MAXPATHLEN) {
+    if (strlcpy(lzeh->zpool, zpool, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
         goto err;
     }
 
@@ -457,10 +457,10 @@ typedef struct libze_list_cbdata {
 static int
 libze_list_cb(zfs_handle_t *zhdl, void *data) {
     libze_list_cbdata_t *cbd = data;
-    char prop_buffer[LIBZE_MAXPATHLEN];
-    char dataset[LIBZE_MAXPATHLEN];
-    char be_name[LIBZE_MAXPATHLEN];
-    char mountpoint[LIBZE_MAXPATHLEN];
+    char prop_buffer[ZFS_MAXPROPLEN];
+    char dataset[ZFS_MAX_DATASET_NAME_LEN];
+    char be_name[ZFS_MAX_DATASET_NAME_LEN];
+    char mountpoint[ZFS_MAX_DATASET_NAME_LEN];
     int ret = LIBZE_ERROR_SUCCESS;
     nvlist_t *props = NULL;
 
@@ -481,7 +481,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     fnvlist_add_string(props, "dataset", dataset);
 
     // Boot env name
-    if (libze_boot_env_name(dataset, LIBZE_MAXPATHLEN, be_name) != 0) {
+    if (libze_boot_env_name(dataset, ZFS_MAX_DATASET_NAME_LEN, be_name) != 0) {
         ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed get boot environment for %s.\n", handle_name);
         goto err;
@@ -489,7 +489,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     fnvlist_add_string(props, "name", be_name);
 
     // Mountpoint
-    char mounted[LIBZE_MAXPATHLEN];
+    char mounted[ZFS_MAX_DATASET_NAME_LEN];
     if (zfs_prop_get(zhdl, ZFS_PROP_MOUNTED, mounted,
             sizeof(mounted), NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
@@ -605,8 +605,8 @@ clone_prop_cb(int prop, void *data) {
     libze_clone_prop_cbdata_t *pcbd = data;
 
     zprop_source_t src;
-    char propbuf[LIBZE_MAXPATHLEN];
-    char statbuf[LIBZE_MAXPATHLEN];
+    char propbuf[ZFS_MAXPROPLEN];
+    char statbuf[ZFS_MAXPROPLEN];
     const char *prop_name;
 
     // Skip if readonly or canmount
@@ -820,7 +820,7 @@ libze_destroy_cb(zfs_handle_t *zh, void *data) {
     }
 
     // Check if clone, origin snapshot saved to buffer
-    char buf[LIBZE_MAXPATHLEN];
+    char buf[ZFS_MAX_DATASET_NAME_LEN];
     if (zfs_prop_get(zh, ZFS_PROP_ORIGIN, buf, sizeof(buf), NULL, NULL, 0, 1) == 0) {
         // Is a clone, continue
         if (cbd->options->destroy_origin) {
@@ -1014,7 +1014,7 @@ typedef struct libze_activate_cbdata {
  */
 static int
 libze_activate_cb(zfs_handle_t *zhdl, void *data) {
-    char buf[LIBZE_MAXPATHLEN];
+    char buf[ZFS_MAXPROPLEN];
     libze_activate_cbdata *cbd = data;
 
     if (zfs_prop_set(zhdl, "canmount", "noauto") != 0) {
@@ -1071,9 +1071,9 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
         nvlist_add_string(props, "mountpoint", "/");
 
         // Not currently mounted
-        char tmpdir_template[LIBZE_MAXPATHLEN] = "";
+        char tmpdir_template[ZFS_MAX_DATASET_NAME_LEN] = "";
         if (libze_util_concat("/tmp/ze.", options->be_name, ".XXXXXX",
-                LIBZE_MAXPATHLEN, tmpdir_template) != 0) {
+                ZFS_MAX_DATASET_NAME_LEN, tmpdir_template) != 0) {
             return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                     "Could not create directory template\n");
         }
