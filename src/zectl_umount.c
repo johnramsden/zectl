@@ -36,7 +36,7 @@ ze_umount(libze_handle *lzeh, int argc, char **argv) {
     options.be_name = argv[0];
 
 //    if ((ret = libze_destroy(lzeh, &options)) != LIBZE_ERROR_SUCCESS) {
-//        fputs(lzeh->libze_err, stderr);
+//        fputs(lzeh->libze_error_message, stderr);
 //    }
 
 err:

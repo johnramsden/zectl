@@ -48,7 +48,7 @@ ze_activate(libze_handle *lzeh, int argc, char **argv) {
     }
 
     if ((ret = libze_activate(lzeh, &options)) != LIBZE_ERROR_SUCCESS) {
-        fputs(lzeh->libze_err, stderr);
+        fputs(lzeh->libze_error_message, stderr);
     }
 
 err:

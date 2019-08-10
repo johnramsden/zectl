@@ -219,7 +219,7 @@ err:
 }
 
 /**
- * @brief Set an error message to @p lzeh->libze_err and return the error type
+ * @brief Set an error message to @p lzeh->libze_error_message and return the error type
  *        given in @p lze_err.
  * @param[in,out] initialized lzeh libze handle
  * @param[in] lze_err Error value returned
@@ -233,23 +233,27 @@ err:
  */
 libze_error
 libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
+
     if (lzeh == NULL) {
         return lze_err;
     }
 
+    lzeh->libze_error = lze_err;
+
     if (lze_fmt == NULL) {
-        strlcpy(lzeh->libze_err, "", LIBZE_MAX_ERROR_LEN);
+        strlcpy(lzeh->libze_error_message, "", LIBZE_MAX_ERROR_LEN);
         return lze_err;
     }
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wuninitialized"
     va_list argptr;
     va_start(argptr, lze_fmt);
-    int length = vsnprintf(lzeh->libze_err, LIBZE_MAX_ERROR_LEN, lze_fmt, argptr);
+    int length = vsnprintf(lzeh->libze_error_message, LIBZE_MAX_ERROR_LEN, lze_fmt, argptr);
     va_end(argptr);
 #pragma clang diagnostic pop
 
-    assert(length < LIBZE_MAX_ERROR_LEN);
+    // Not worth failing on assert? Will just truncate
+    // assert(length < LIBZE_MAX_ERROR_LEN);
 
     return lze_err;
 }
@@ -267,6 +271,21 @@ libze_error_nomem(libze_handle *lzeh) {
         return LIBZE_ERROR_NOMEM;
     }
     return libze_error_set(lzeh, LIBZE_ERROR_NOMEM, "Failed to allocate memory.\n");
+}
+
+/**
+ * @brief Convenience function to set no memory error message
+ * @param[in,out] initialized lzeh libze handle
+ * @return @p LIBZE_ERROR_NOMEM
+ *
+ * @pre @p lzeh != NULL
+ */
+libze_error
+libze_error_clear(libze_handle *lzeh) {
+    if (lzeh == NULL) {
+        return LIBZE_ERROR_SUCCESS;
+    }
+    return libze_error_set(lzeh, LIBZE_ERROR_SUCCESS, NULL);
 }
 
 /**
@@ -391,7 +410,7 @@ libze_init(void) {
     }
 
     // Clear any error messages
-    (void)libze_error_set(lzeh, LIBZE_ERROR_SUCCESS, NULL);
+    (void) libze_error_set(lzeh, LIBZE_ERROR_SUCCESS, NULL);
 
     free(zpool);
     return lzeh;
