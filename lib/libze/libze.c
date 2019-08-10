@@ -122,7 +122,6 @@ libze_set_default_props(libze_handle *lzeh, nvlist_t *default_prop,
         }
     }
 
-
     return ret;
 }
 
@@ -158,6 +157,57 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
     }
 
     return ret;
+}
+
+/**
+ * @brief Get a ZFS property value from @a lzeh->ze_props
+ *
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[out] result_prop Property of boot environment
+ * @param[in] prop ZFS property looking for
+ * @param[in] namespace ZFS property prefix
+ * @return LIBZE_ERROR_SUCCESS on success, or
+ *         LIBZE_ERROR_MAXPATHLEN, LIBZE_ERROR_UNKNOWN
+ *
+ * @pre @p lzeh != NULL
+ * @pre @p property != NULL
+ * @pre @p namespace != NULL
+ */
+libze_error
+libze_get_be_prop(libze_handle *lzeh, char result_prop[ZFS_MAXPROPLEN], const char property[static 1],
+        const char namespace[static 1]) {
+    nvlist_t *lookup_prop = NULL;
+
+    char prop_buf[ZFS_MAXPROPLEN] = "";
+    if (libze_util_concat(namespace, ":", property, ZFS_MAXPROPLEN, prop_buf) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Exceeded length of property.\n");
+    }
+
+    if (nvlist_lookup_nvlist(lzeh->ze_props, prop_buf, &lookup_prop) != 0) {
+        (void ) strlcpy(result_prop, "", ZFS_MAXPROPLEN);
+        return LIBZE_ERROR_SUCCESS;
+    }
+
+    nvpair_t *prop = NULL;
+    // Should always have a value if set correctly
+    if (nvlist_lookup_nvpair(lookup_prop, "value", &prop) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Property nvlist set incorrectly.\n");
+    }
+
+    char *string_prop = NULL;
+    if (nvpair_value_string(prop, &string_prop) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Property nvlist value is wrong type. Should be a string.\n");
+    }
+
+    if (strlcpy(result_prop, string_prop, ZFS_MAXPROPLEN) >= ZFS_MAXPROPLEN) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Property is too large.\n");
+    }
+
+    return LIBZE_ERROR_SUCCESS;
 }
 
 /**
@@ -298,28 +348,17 @@ libze_error_clear(libze_handle *lzeh) {
  */
 static libze_error
 check_for_bootloader(libze_handle *lzeh) {
-    char *plugin = NULL;
+    char plugin[ZFS_MAXPROPLEN] = "";
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    char p_buff[ZFS_MAXPROPLEN] = "";
-    if (libze_util_concat(ZE_PROP_NAMESPACE, ":", "bootloader", ZFS_MAXPROPLEN, p_buff) != 0) {
-        return -1;
-    }
-    nvlist_t *nvl;
-    if (nvlist_lookup_nvlist(lzeh->ze_props, p_buff, &nvl) != 0) {
-        // Unset
-        return 0;
+    ret = libze_get_be_prop(lzeh, plugin, "bootloader", ZE_PROP_NAMESPACE);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
     }
 
-    nvpair_t *pair = NULL;
-    for (pair = nvlist_next_nvpair(nvl, NULL); pair != NULL;
-         pair = nvlist_next_nvpair(nvl, pair)) {
-        if (strcmp(nvpair_name(pair), "value") == 0) {
-            plugin = fnvpair_value_string(pair);
-        }
-    }
-    if (plugin == NULL) {
-        return -1;
+    // No plugin set
+    if (strlen(plugin) == 0) {
+        return LIBZE_ERROR_SUCCESS;
     }
 
     void *p_handle = libze_plugin_open(plugin);

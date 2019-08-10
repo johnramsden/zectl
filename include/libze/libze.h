@@ -78,12 +78,6 @@ libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suf
 int
 libze_boot_env_name(const char *dataset, size_t buflen, char *buf);
 
-int
-libze_prop_prefix(const char path[static 1], size_t buflen, char buf[buflen]);
-
-libze_error
-libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]);
-
 /* Function pointer to command */
 typedef libze_error (*bootloader_func)(libze_handle *lzeh);
 
@@ -130,4 +124,10 @@ libze_set_default_props(libze_handle *lzeh, nvlist_t *default_prop, const char n
 libze_error
 libze_add_default_prop(nvlist_t **prop_out, const char name[static 3], const char value[static 1],
                        const char *namespace);
+
+libze_error
+libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]);
+libze_error
+libze_get_be_prop(libze_handle *lzeh, char result_prop[ZFS_MAXPROPLEN], const char property[static 1],
+                  const char namespace[static 1]);
 #endif //ZECTL_LIBZE_H
