@@ -27,6 +27,18 @@ typedef struct libze_handle libze_handle;
 typedef struct libze_plugin_fn_export libze_plugin_fn_export;
 
 /**
+ * @struct
+ * @brief
+ *
+ * @invariant if bootpool: ((boot_pool.lzbph != NULL) && (strlen(boot_pool_root) >= 1))
+ * @invariant if no bootpool: ((boot_pool.lzbph == NULL) && (strlen(boot_pool_root) == 0))
+ */
+typedef struct boot_pool {
+    zfs_handle_t *lzbph;                             /**< Handle to boot pool boot-root */
+    char boot_pool_root[ZFS_MAX_DATASET_NAME_LEN];   /**< boot pool boot-root name      */
+} boot_pool;
+
+/**
  * @struct libze_handle
  * @brief Used for majority of libze functions.
  *
@@ -37,6 +49,7 @@ typedef struct libze_plugin_fn_export libze_plugin_fn_export;
  * @invariant strlen(rootfs) >= 3
  * @invariant strlen(bootfs) >= 3
  * @invariant strlen(zpool) >= 1
+ * @invariant strlen(libze_error_message) == 0
  * @invariant libze_error == LIBZE_ERROR_SUCCESS
  *
  * @invariant Closed with libze_fini:
@@ -50,6 +63,7 @@ struct libze_handle {
     char rootfs[ZFS_MAX_DATASET_NAME_LEN];          /**< Root dataset (current mounted '/') */
     char bootfs[ZFS_MAX_DATASET_NAME_LEN];          /**< Dataset set to bootfs              */
     char zpool[ZFS_MAX_DATASET_NAME_LEN];           /**< ZFS pool name                      */
+    boot_pool bootpool;                             /**< boot pool                          */
     libze_plugin_fn_export *lz_funcs;               /**< Pointer to bootloader plugin       */
     nvlist_t *ze_props;                             /**< User org.zectl properties          */
     char libze_error_message[LIBZE_MAX_ERROR_LEN];  /**< Last error buffer                  */
@@ -66,7 +80,10 @@ libze_handle *
 libze_init(void);
 
 void
-libze_fini(libze_handle *);
+libze_fini(libze_handle *lzeh);
+
+libze_error
+libze_set_boot_pool(libze_handle *lzeh);
 
 libze_error
 libze_list(libze_handle *lzeh, nvlist_t **outnvl);

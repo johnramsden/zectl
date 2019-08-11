@@ -390,6 +390,80 @@ check_for_bootloader(libze_handle *lzeh) {
  ********************************************************/
 
 /**
+ * @brief Rep invariant check for initialized @p libze_handle
+ * @param lzeh @p libze_handle to check
+ * @return Non-zero if rep check fails, else zero
+ */
+static int
+libze_handle_rep_check_init(libze_handle *lzeh) {
+    int ret = 0;
+    char check_failure[LIBZE_MAX_ERROR_LEN] = "ERROR - libze_handle RI:\n";
+
+    if (lzeh == NULL) {
+        fprintf(stderr, "ERROR - libze_handle RI: libze_handle isn't initialized\n");
+        return -1;
+    }
+
+    if ((lzeh->lzh == NULL) || (lzeh->lzph == NULL) || ((lzeh->ze_props == NULL))) {
+        (void) strlcat(check_failure, "A handle isn't initialized\n", LIBZE_MAX_ERROR_LEN);
+        ret++;
+    }
+    if (!((strlen(lzeh->be_root) >= 1) && (strlen(lzeh->rootfs) >= 3) &&
+          (strlen(lzeh->bootfs) >= 3) && (strlen(lzeh->zpool) >= 1))) {
+        (void) strlcat(check_failure, "Lengths of strings incorrect\n", LIBZE_MAX_ERROR_LEN);
+        ret++;
+    }
+
+    if ((lzeh->libze_error != LIBZE_ERROR_SUCCESS) || (strlen(lzeh->libze_error_message) != 0)) {
+        (void) strlcat(check_failure, "Errors not cleared\n", LIBZE_MAX_ERROR_LEN);
+        ret++;
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Check if a boot pool is set, if it is, set @p lzeh->bootpool
+ * @param lzeh Initialized @p libze_handle
+ * @return @p LIBZE_ERROR_SUCCESS if no boot pool set, or if boot pool dataset set successfully.
+ *         @p LIBZE_ERROR_MAXPATHLEN if requested boot pool is too long.
+ *         @p LIBZE_ERROR_ZFS_OPEN if @p lzeh->bootpool.lzbph can't be opened,
+ *         @p LIBZE_ERROR_MAXPATHLEN if @p bootpool too long
+ */
+libze_error
+libze_set_boot_pool(libze_handle *lzeh) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char boot_pool[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if ((ret = libze_get_be_prop(lzeh, boot_pool, "bootpool", ZE_PROP_NAMESPACE)) != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    // Boot pool is not set
+    if (strlen(boot_pool) == 0) {
+        lzeh->bootpool.lzbph = NULL;
+        (void) strlcpy(lzeh->bootpool.boot_pool_root, "", ZFS_MAX_DATASET_NAME_LEN);
+        return ret;
+    }
+
+    zfs_handle_t *zph = zfs_open(lzeh->lzh, boot_pool, ZFS_TYPE_FILESYSTEM);
+    if (zph == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Failed to open boot pool root '%s'\n", boot_pool);
+    }
+
+    if (strlcpy(lzeh->bootpool.boot_pool_root, boot_pool, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+        // Maintain invariant, don't leave inconsistent
+        (void) strlcpy(lzeh->bootpool.boot_pool_root, "", ZFS_MAX_DATASET_NAME_LEN);
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Requested boot pool is too long\n");
+    }
+
+    lzeh->bootpool.lzbph = zph;
+
+    return ret;
+}
+
+/**
  * @brief Initialize libze handle.
  * @return Initialized handle, or NULL if unsuccessful.
  */
@@ -400,7 +474,7 @@ libze_init(void) {
     char *zpool = NULL;
 
     if ((lzeh = calloc(1, sizeof(libze_handle))) == NULL) {
-        goto err;
+        return NULL;
     }
     if ((lzeh->lzh = libzfs_init()) == NULL) {
         goto err;
@@ -448,15 +522,23 @@ libze_init(void) {
         goto err;
     }
 
+    // Clear bootpool
+    lzeh->bootpool.lzbph = NULL;
+    (void) strlcpy(lzeh->bootpool.boot_pool_root, "", ZFS_MAX_DATASET_NAME_LEN);
+
     // Clear any error messages
-    (void) libze_error_set(lzeh, LIBZE_ERROR_SUCCESS, NULL);
+    (void) libze_error_clear(lzeh);
+
+    assert(libze_handle_rep_check_init(lzeh) == 0);
 
     free(zpool);
     return lzeh;
 
 err:
     libze_fini(lzeh);
-    if (zpool != NULL) { free(zpool); }
+    if (zpool != NULL) {
+        free(zpool);
+    }
     return NULL;
 }
 
@@ -466,6 +548,7 @@ err:
  *
  * @post @p lzeh->lzh is closed
  * @post @p lzeh->lzph is closed
+ * @post @p llzeh->bootpool.lzbph is closed
  * @post @p lzeh->ze_props is free'd
  * @post @p lzeh is free'd
  */
@@ -490,8 +573,13 @@ libze_fini(libze_handle *lzeh) {
         lzeh->ze_props = NULL;
     }
 
+    // Cleanup bootloader
+    if (lzeh->bootpool.lzbph != NULL) {
+        zfs_close(lzeh->bootpool.lzbph);
+        lzeh->bootpool.lzbph = NULL;
+    }
+
     free(lzeh);
-    lzeh = NULL;
 }
 
 /**********************************
@@ -864,36 +952,40 @@ typedef struct libze_destroy_cbdata {
     libze_destroy_options *options;
 } libze_destroy_cbdata;
 
+/**
+ * @brief Destroy callback called for each child recursively
+ * @param zh Handle of each dataset to dataset
+ * @param data @p libze_destroy_cbdata callback data
+ * @return non-zero if not successful
+ */
 static int
 libze_destroy_cb(zfs_handle_t *zh, void *data) {
     int ret = 0;
     libze_destroy_cbdata *cbd = data;
 
     const char *ds = zfs_get_name(zh);
-    if (zfs_is_mounted(zh, NULL) && cbd->options->force) {
-        zfs_unmount(zh, NULL, 0);
-    } else {
-        return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
-                "Dataset %s is mounted, run with force or unmount dataset\n", ds);
+    if (zfs_is_mounted(zh, NULL)) {
+        if (cbd->options->force) {
+            zfs_unmount(zh, NULL, 0);
+        } else {
+            return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                    "Dataset %s is mounted, run with force or unmount dataset\n", ds);
+        }
     }
 
-    // Check if clone, origin snapshot saved to buffer
-    char buf[ZFS_MAX_DATASET_NAME_LEN];
-    if (zfs_prop_get(zh, ZFS_PROP_ORIGIN, buf, sizeof(buf), NULL, NULL, 0, 1) == 0) {
-        // Is a clone, continue
-        if (cbd->options->destroy_origin) {
+    zfs_handle_t *origin_h = NULL;
+    // Dont run destroy_origin if snap callback
+    if ((strchr(zfs_get_name(zh), '@') == NULL) && cbd->options->destroy_origin) {
+        // Check if clone, origin snapshot saved to buffer
+        char buf[ZFS_MAX_DATASET_NAME_LEN];
+        if (zfs_prop_get(zh, ZFS_PROP_ORIGIN, buf, sizeof(buf), NULL, NULL, 0, 1) == 0) {
             // Destroy origin snapshot
-            zfs_handle_t *origin_h = zfs_open(cbd->lzeh->lzh, buf, ZFS_TYPE_SNAPSHOT);
-            if (origin_h != NULL) {
-                if (zfs_destroy(origin_h, B_FALSE) != 0) {
-                    zfs_close(origin_h);
-                    return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
-                            "Failed to destroy origin snapshot %s\n", buf);
-                }
+            origin_h = zfs_open(cbd->lzeh->lzh, buf, ZFS_TYPE_SNAPSHOT);
+            if (origin_h == NULL) {
+                return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                        "Failed to open origin snapshot %s\n", buf);
             }
-            zfs_close(origin_h);
         }
-        // TODO: If dependent clones exist, should we promote them? Not sure if that ever occurs.
     }
 
     // Destroy children recursively
@@ -901,10 +993,18 @@ libze_destroy_cb(zfs_handle_t *zh, void *data) {
         return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed to iterate over children of %s\n", ds);
     }
-    // Destroy dataset
+    // Destroy dataset, ignore error if inner snap recurse so destroy continues
     if (zfs_destroy(zh, B_FALSE) != 0) {
         return libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed to destroy dataset %s\n", ds);
+    }
+
+    if (cbd->options->destroy_origin && (origin_h != NULL)) {
+        if ((ret = libze_destroy_cb(origin_h, cbd)) != 0) {
+            libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                    "Failed to destroy origin snapshot %s\n", zfs_get_name(origin_h));
+        }
+        zfs_close(origin_h);
     }
 
     return ret;
@@ -1006,6 +1106,41 @@ destroy_snapshot(libze_handle *lzeh, libze_destroy_options *options,
 }
 
 /**
+ * @brief Check if a boot pool is set, if it is destroy the associated dataset.
+ *        Dataset should be: bootpool + "/boot/env/ze-" + be
+ * @param lzeh Initialized @p libze_handle
+ * @param options Destroy options
+ * @return @p LIBZE_ERROR_SUCCESS if no boot pool set, if boot pool dataset doesn't exist,
+ *             or if boot pool dataset destroyed successfully.
+ *         @p LIBZE_ERROR_MAXPATHLEN if requested boot pool is too long.
+ *         @p LIBZE_ERROR_ZFS_OPEN if @p filesystem can't be opened,
+ *         @p LIBZE_ERROR_EEXIST if @p filesystem doesnt exist,
+ */
+static libze_error
+libze_destroy_boot_pool(libze_handle *lzeh, libze_destroy_options *options) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    if (lzeh->bootpool.lzbph == NULL) {
+        // No bootpool set
+        return ret;
+    }
+
+    char boot_pool_dataset[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/ze-",
+            options->be_name, ZFS_MAX_DATASET_NAME_LEN, boot_pool_dataset) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Requested boot pool is too long.\n");
+    }
+
+    ret = destroy_filesystem(lzeh, options, boot_pool_dataset);
+    // Ignore if doesn't exist, could be an old non-bootpool BE
+    switch (ret) {
+        case LIBZE_ERROR_EEXIST: return LIBZE_ERROR_SUCCESS;
+        case LIBZE_ERROR_SUCCESS: return LIBZE_ERROR_SUCCESS;
+        default: return ret;
+    }
+}
+
+/**
  * @brief Destroy a boot environment
  * @param lzeh Initialized @p libze_handle
  * @param options Destroy options
@@ -1038,6 +1173,10 @@ libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
 
     if ((strchr(be_ds_buff, '@') == NULL)) {
         if ((ret = destroy_filesystem(lzeh, options, be_ds_buff)) != LIBZE_ERROR_SUCCESS) {
+            return ret;
+        }
+
+        if ((ret = libze_destroy_boot_pool(lzeh, options)) != LIBZE_ERROR_SUCCESS) {
             return ret;
         }
     } else {

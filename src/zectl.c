@@ -142,6 +142,11 @@ main(int argc, char *argv[]) {
     if ((lzeh = libze_init()) == NULL) {
         fprintf(stderr, "%s: System may not be configured correctly "
                "for boot environments\n", ZE_PROGRAM);
+        return EXIT_FAILURE;
+    }
+
+    if (libze_set_boot_pool(lzeh) != LIBZE_ERROR_SUCCESS) {
+        fputs(lzeh->libze_error_message, stderr);
         ret = EXIT_FAILURE;
         goto fin;
     }
