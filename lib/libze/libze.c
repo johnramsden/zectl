@@ -730,9 +730,9 @@ err:
     return ret;
 }
 
-/***********************************
- ************** clone **************
- ***********************************/
+/**********************************************
+ ************** clone and create **************
+ **********************************************/
 
 typedef struct libze_clone_prop_cbdata {
     libze_handle *lzeh;
@@ -943,6 +943,261 @@ err:
     return ret;
 }
 
+/**
+ * @brief Create a snapshot timestamp
+ * @param buflen Length of buffer @p buf
+ * @param buf Buffer for snapshot timestamp
+ * @return non-zero if buffer length exceeded
+ */
+static int
+gen_snap_suffix(size_t buflen, char buf[buflen]) {
+    time_t now_time;
+    time(&now_time);
+    return strftime(buf, buflen, "%F-%T", localtime(&now_time)) != 0;
+}
+
+typedef struct create_data {
+    char snap_suffix[ZFS_MAX_DATASET_NAME_LEN];
+    char source_dataset[ZFS_MAX_DATASET_NAME_LEN];
+    boolean_t is_snap;
+} create_data;
+
+/**
+ * @brief Cut snapshot and dataset from full snapshot
+ * @param[in] source_snap Source full snapshot
+ * @param[out] dest_dataset Destination dataset
+ * @param[out] dest_snapshot Destination snapshot suffix
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN if ZFS_MAX_DATASET_NAME_LEN exceeded,
+ *         @p LIBZE_ERROR_UNKNOWN if no suffix found
+ */
+static libze_error
+get_snap_and_dataset(const char source_snap[ZFS_MAX_DATASET_NAME_LEN],
+        char dest_dataset[ZFS_MAX_DATASET_NAME_LEN], char dest_snapshot[ZFS_MAX_DATASET_NAME_LEN]) {
+    // Get snapshot dataset
+    if (libze_util_cut(source_snap, ZFS_MAX_DATASET_NAME_LEN,
+            dest_dataset, '@') != 0) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+    // Get snap suffix
+    if (libze_util_suffix_after_string(dest_dataset, source_snap,
+            ZFS_MAX_DATASET_NAME_LEN, dest_snapshot) != 0) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+/**
+ * @brief Prepare boot pool data
+ * @param lzeh Initialized libze handle
+ * @param source_snap Source snapshot
+ * @param source_be_name Source boot environment name
+ * @param dest_dataset Destination full dataset
+ * @param dest_snapshot_suffix Destination snapshot suffix
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN if @p ZFS_MAX_DATASET_NAME_LEN exceeded,
+ *         @p LIBZE_ERROR_UNKNOWN if no snapshot suffix found
+ */
+static libze_error
+prepare_existing_boot_pool_data(libze_handle *lzeh, const char source_snap[ZFS_MAX_DATASET_NAME_LEN],
+        const char source_be_name[ZFS_MAX_DATASET_NAME_LEN], char dest_dataset[ZFS_MAX_DATASET_NAME_LEN],
+        char dest_snapshot_suffix[ZFS_MAX_DATASET_NAME_LEN]) {
+    char t_buff[ZFS_MAX_DATASET_NAME_LEN];
+    switch (get_snap_and_dataset(source_snap, t_buff, dest_snapshot_suffix)) {
+        case LIBZE_ERROR_MAXPATHLEN:
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                    "Source snapshot %s is too long.\n", source_snap);
+        case LIBZE_ERROR_UNKNOWN:
+            return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                    "Source snapshot %s doesn't contain snapshot suffix or is too long.\n",
+                    source_snap);
+        default: break;
+    }
+
+    int len = libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/",
+            source_be_name, ZFS_MAX_DATASET_NAME_LEN, dest_dataset);
+    if (len >= ZFS_MAX_DATASET_NAME_LEN) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Boot pool dataset is too long.\n");
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, dest_dataset, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Source boot pool dataset doesn't exist.\n");
+    }
+
+    char ds_snap_buf[ZFS_MAX_DATASET_NAME_LEN];
+    len = libze_util_concat(dest_dataset, "@", source_snap, ZFS_MAX_DATASET_NAME_LEN, ds_snap_buf);
+    if (len >= ZFS_MAX_DATASET_NAME_LEN) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Boot pool snapshot is too long.\n");
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, ds_snap_buf, ZFS_TYPE_SNAPSHOT)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Source boot pool snapshot doesn't exist.\n");
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+/**
+ * @brief Populate @p cdata with what is necessary for create
+ * @param[in] lzeh Initialized libze handle
+ * @param[in] options Create options
+ * @param[out] cdata Data to populate
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_EEXIST if source doesn't exist,
+ *         @p LIBZE_ERROR_MAXPATHLEN if source is too long,
+ *         @p LIBZE_ERROR_UNKNOWN if no snap suffix found
+ *
+ * @pre (options->existing == B_TRUE) && (strlen(cdata->source_dataset) > 0)
+ */
+static libze_error
+prepare_create_from_existing(libze_handle *lzeh, const char be_source[ZFS_MAX_DATASET_NAME_LEN], create_data *cdata) {
+    // Is a snapshot
+    if (strchr(be_source, '@') != NULL) {
+        cdata->is_snap = B_TRUE;
+        if (!zfs_dataset_exists(lzeh->lzh, be_source, ZFS_TYPE_SNAPSHOT)) {
+            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                    "Source snapshot %s doesn't exist.\n", be_source);
+        }
+
+        switch (get_snap_and_dataset(be_source, cdata->source_dataset, cdata->snap_suffix)) {
+            case LIBZE_ERROR_MAXPATHLEN:
+                return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                        "Source snapshot %s is too long.\n", be_source);
+            case LIBZE_ERROR_UNKNOWN:
+                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                        "Source snapshot %s doesn't contain snapshot suffix or is too long.\n",
+                        be_source);
+            default: return LIBZE_ERROR_SUCCESS;
+        }
+    }
+
+    cdata->is_snap = B_FALSE;
+    // Regular dataset
+    if (!zfs_dataset_exists(lzeh->lzh, be_source, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Source dataset %s doesn't exist.\n", be_source);
+    }
+    if (strlcpy(cdata->source_dataset, be_source, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Source dataset %s exceeds max dataset length.\n", be_source);
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+/**
+ * @brief Create boot environment
+ * @param lzeh Initialized libze handle
+ * @param options Options for boot environment
+ * @return non @p LIBZE_ERROR_SUCCESS on failure
+ */
+libze_error
+libze_create(libze_handle *lzeh, libze_create_options *options) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    create_data cdata;
+    create_data boot_pool_cdata;
+
+    // Populate cdata from existing dataset or snap
+    if (options->existing) {
+        ret = prepare_create_from_existing(lzeh, options->be_source, &cdata);
+        if (ret != LIBZE_ERROR_SUCCESS) {
+            return ret;
+        }
+
+        if (lzeh->bootpool.lzbph != NULL) {
+            /* Setup source as (boot pool root)/env/(existing name)
+             * Since from existing, use snap suffix from existing */
+            char dest_ds_buf[ZFS_MAX_DATASET_NAME_LEN];
+            char dest_snap_buf[ZFS_MAX_DATASET_NAME_LEN];
+            ret = prepare_existing_boot_pool_data(lzeh, options->be_source, options->be_name,
+                    dest_ds_buf, dest_snap_buf);
+            if (ret != LIBZE_ERROR_SUCCESS) {
+                return ret;
+            }
+            ret = prepare_create_from_existing(lzeh, dest_ds_buf, &boot_pool_cdata);
+            if (ret != LIBZE_ERROR_SUCCESS) {
+                return ret;
+            }
+        }
+    } else { // Populate cdata from bootfs
+        cdata.is_snap = B_FALSE;
+        if (strlcpy(cdata.source_dataset, lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                    "Source dataset %s exceeds max dataset length.\n", lzeh->bootfs);
+        }
+        char snap_buf[ZFS_MAX_DATASET_NAME_LEN];
+        (void) gen_snap_suffix(ZFS_MAX_DATASET_NAME_LEN, cdata.snap_suffix);
+        int len = libze_util_concat(cdata.source_dataset, "@",
+                cdata.snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf);
+        if (len >= ZFS_MAX_DATASET_NAME_LEN) {
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                    "Source dataset snapshot will exceed max dataset length.\n");
+        }
+
+        if (zfs_snapshot(lzeh->lzh, snap_buf, options->recursive, NULL) != 0) {
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                    "Failed to create snapshot %s.\n", snap_buf);
+        }
+
+        if (lzeh->bootpool.lzbph != NULL) {
+            boot_pool_cdata.is_snap = B_FALSE;
+            char be_name[ZFS_MAX_DATASET_NAME_LEN];
+            // Boot env name
+            if (libze_boot_env_name(lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN, be_name) != 0) {
+                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                        "Failed get boot environment for %s.\n", lzeh->bootfs);
+            }
+            if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/",
+                    be_name, ZFS_MAX_DATASET_NAME_LEN, boot_pool_cdata.source_dataset) != 0) {
+                return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                        "Source boot pool dataset exceeds max dataset length.\n");
+            }
+            // We already checked length above
+            (void) strlcpy(boot_pool_cdata.snap_suffix, cdata.snap_suffix, ZFS_MAX_DATASET_NAME_LEN);
+            len = libze_util_concat(boot_pool_cdata.source_dataset, "@",
+                    boot_pool_cdata.snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf);
+            if (len >= ZFS_MAX_DATASET_NAME_LEN) {
+                return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                        "Source boot pool dataset snapshot will exceed max dataset length.\n");
+            }
+            if (zfs_snapshot(lzeh->lzh, snap_buf, options->recursive, NULL) != 0) {
+                return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                        "Failed to create snapshot %s.\n", snap_buf);
+            }
+        }
+    }
+
+    char clone_buf[ZFS_MAX_DATASET_NAME_LEN];
+    if (libze_util_concat(lzeh->be_root, "/", options->be_name,
+            ZFS_MAX_DATASET_NAME_LEN, clone_buf) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "New boot environment will exceed max dataset length.\n");
+    }
+    if (libze_clone(lzeh, cdata.source_dataset, cdata.snap_suffix,
+            clone_buf, options->recursive) != LIBZE_ERROR_SUCCESS) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+    if (lzeh->bootpool.lzbph != NULL) {
+        if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/", options->be_name,
+                ZFS_MAX_DATASET_NAME_LEN, clone_buf) != 0) {
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                    "New boot pool dataset will exceed max dataset length.\n");
+        }
+        if (libze_clone(lzeh, boot_pool_cdata.source_dataset, boot_pool_cdata.snap_suffix,
+                clone_buf, options->recursive) != LIBZE_ERROR_SUCCESS) {
+            return LIBZE_ERROR_UNKNOWN;
+        }
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+
 /*************************************
  ************** destroy **************
  *************************************/
@@ -1126,7 +1381,7 @@ libze_destroy_boot_pool(libze_handle *lzeh, libze_destroy_options *options) {
     }
 
     char boot_pool_dataset[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/ze-",
+    if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/",
             options->be_name, ZFS_MAX_DATASET_NAME_LEN, boot_pool_dataset) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Requested boot pool is too long.\n");
     }

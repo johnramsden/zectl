@@ -14,6 +14,9 @@
 int
 libze_util_concat(const char *prefix, const char *separator, const char *suffix,
                   size_t buflen, char buf[buflen]) {
+
+    (void) strlcpy(buf, "", buflen);
+
     if ((strlcat(buf, prefix, buflen) >= buflen) ||
         (strlcat(buf, separator, buflen) >= buflen) ||
         (strlcat(buf, suffix, buflen) >= buflen)) {

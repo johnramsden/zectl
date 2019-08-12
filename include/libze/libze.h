@@ -34,7 +34,7 @@ typedef struct libze_plugin_fn_export libze_plugin_fn_export;
  * @invariant if no bootpool: ((boot_pool.lzbph == NULL) && (strlen(boot_pool_root) == 0))
  */
 typedef struct boot_pool {
-    zfs_handle_t *lzbph;                             /**< Handle to boot pool boot-root */
+    zfs_handle_t *lzbph;                             /**< Handle to current dataset */
     char boot_pool_root[ZFS_MAX_DATASET_NAME_LEN];   /**< boot pool boot-root name      */
 } boot_pool;
 
@@ -121,10 +121,19 @@ typedef struct libze_destroy_options {
     boolean_t force;
 } libze_destroy_options;
 
+typedef struct libze_create_options {
+    boolean_t existing;
+    boolean_t recursive;
+    char be_name[ZFS_MAX_DATASET_NAME_LEN];
+    char be_source[ZFS_MAX_DATASET_NAME_LEN];
+} libze_create_options;
+
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options);
 libze_error
 libze_destroy(libze_handle *lzeh, libze_destroy_options *options);
+libze_error
+libze_create(libze_handle *lzeh, libze_create_options *options);
 
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]);
@@ -147,4 +156,5 @@ libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[s
 libze_error
 libze_get_be_prop(libze_handle *lzeh, char result_prop[ZFS_MAXPROPLEN], const char property[static 1],
                   const char namespace[static 1]);
+
 #endif //ZECTL_LIBZE_H
