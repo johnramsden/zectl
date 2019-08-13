@@ -91,7 +91,7 @@ define_default_props(libze_handle *lzeh) {
     return 0;
 }
 
-#define NUM_COMMANDS 4 // Will be 9
+#define NUM_COMMANDS 5 // Will be 9
 
 int
 main(int argc, char *argv[]) {
@@ -109,13 +109,13 @@ main(int argc, char *argv[]) {
             {"activate", ze_activate},
             {"create", ze_create},
             {"destroy", ze_destroy},
-//            {"get", ze_run_get},
+//            {"get", ze_get},
             {"list",   ze_list},
-//            {"mount", ze_run_mount},
-//            {"rename", ze_run_rename},
-//            {"set", ze_run_set},
-//            {"snapshot", ze_run_snapshot},
-//            {"unmount", ze_run_unmount}
+//            {"mount", ze_mount},
+//            {"rename", ze_rename},
+            {"set", ze_set},
+//            {"snapshot", ze_snapshot},
+//            {"unmount", ze_unmount}
     };
 
     /* Check correct number of parameters were input */

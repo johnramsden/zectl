@@ -9,6 +9,8 @@ set(SOURCE_FILES
         zectl_mount.c
         zectl_umount.c
         zectl_rename.c
+        zectl_set.c
+        zectl_get.c
 )
 
 list(APPEND ZE_LINK_LIBRARIES

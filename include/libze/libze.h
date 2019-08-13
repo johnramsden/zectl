@@ -134,6 +134,8 @@ libze_error
 libze_destroy(libze_handle *lzeh, libze_destroy_options *options);
 libze_error
 libze_create(libze_handle *lzeh, libze_create_options *options);
+libze_error
+libze_set(libze_handle *lzeh, nvlist_t *properties);
 
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]);

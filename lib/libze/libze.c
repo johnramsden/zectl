@@ -1646,41 +1646,32 @@ err:
     return ret;
 }
 
-#ifdef UNUSED
+/*********************************
+ ************** set **************
+ *********************************/
+
 /**
- * @brief set be required props
- * @param lzeh Open libze_handle
- * @param be_zh Open zfs handle
- * @return libze_error
+ * @brief Set a list of properties on the BE root
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] properties List of ZFS properties to set
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_ZFS_OPEN if failure to open @p lzeh->be_root,
+ *         @p LIBZE_ERROR_UNKNOWN if failure to set properties
  */
-static libze_error
-set_be_props(libze_handle *lzeh, zfs_handle_t *be_zh, const char be_name[static 1]) {
+libze_error
+libze_set(libze_handle *lzeh, nvlist_t *properties) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    nvlist_t *props = fnvlist_alloc();
-    if (props == NULL) {
-        return LIBZE_ERROR_NOMEM;
-    }
-    nvlist_add_string(props, "canmount", "noauto");
-    if (strcmp(lzeh->rootfs, be_name) != 0) {
-        nvlist_add_string(props, "mountpoint", "/");
+    zfs_handle_t *be_root_zh = zfs_open(lzeh->lzh, lzeh->be_root, ZFS_TYPE_FILESYSTEM);
+    if (be_root_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Failed to open BE root %s\n", lzeh->be_root);
     }
 
-    if (zfs_prop_set_list(be_zh, props) != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed to set properties for %s:\n"
-                "\tcanmount=noauto\n\tmountpoint=/\n\n", be_name);
-        goto err;
+    if (zfs_prop_set_list(be_root_zh, properties) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to set properties\n");
     }
 
-    if (zpool_set_prop(lzeh->lzph, "bootfs", be_name) != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed setting bootfs=%s\n", be_name);
-        goto err;
-    }
-
-err:
-    nvlist_free(props);
+    zfs_close(be_root_zh);
     return ret;
 }
-#endif
