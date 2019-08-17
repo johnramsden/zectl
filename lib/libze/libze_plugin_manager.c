@@ -10,8 +10,8 @@
  * @param[in] ze_plugin Name of the plugin
  * @return Handle to the library, or @p NULL if it doesn't exist
  */
-void *
-libze_plugin_open(char *ze_plugin) {
+libze_plugin_manager_error
+libze_plugin_open(char *ze_plugin, void **p_handle) {
 #ifndef PLUGINS_DIRECTORY
     return LIBZE_PLUGIN_MANAGER_ERROR_PDIR_EEXIST;
 #endif
@@ -20,11 +20,17 @@ libze_plugin_open(char *ze_plugin) {
     if ((strlcat(plugin_path, "/libze_plugin_", PLUGIN_MAX_PATHLEN) >= PLUGIN_MAX_PATHLEN) ||
         (strlcat(plugin_path, ze_plugin, PLUGIN_MAX_PATHLEN) >= PLUGIN_MAX_PATHLEN) ||
         (strlcat(plugin_path, ".so", PLUGIN_MAX_PATHLEN) >= PLUGIN_MAX_PATHLEN)) {
-        return NULL;
+        return LIBZE_PLUGIN_MANAGER_ERROR_MAXPATHLEN;
     }
 
     // NULL if plugin nonexistent
-    return dlopen(plugin_path, RTLD_NOW);
+    *p_handle = dlopen(plugin_path, RTLD_NOW);
+
+    if (*p_handle == NULL) {
+        return LIBZE_PLUGIN_MANAGER_ERROR_EEXIST;
+    }
+
+    return LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS;
 }
 
 /**

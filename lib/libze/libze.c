@@ -31,8 +31,8 @@ const char *ZE_PROP_NAMESPACE = "org.zectl";
    @endverbatim
  */
 libze_error
-libze_add_default_prop(nvlist_t **prop_out, const char name[static 3], const char value[static 1],
-        const char *namespace) {
+libze_default_prop_add(nvlist_t **prop_out, const char *name, const char *value,
+                       const char *namespace) {
     nvlist_t *default_prop = fnvlist_alloc();
     if (default_prop == NULL) {
         return LIBZE_ERROR_NOMEM;
@@ -70,8 +70,8 @@ err:
  * @pre @p namespace != NULL
  */
 libze_error
-libze_set_default_props(libze_handle *lzeh, nvlist_t *default_prop,
-        const char namespace[static 1]) {
+libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop,
+                        const char *namespace) {
     nvpair_t *pair = NULL;
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
@@ -174,8 +174,8 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
  * @pre @p namespace != NULL
  */
 libze_error
-libze_get_be_prop(libze_handle *lzeh, char result_prop[ZFS_MAXPROPLEN], const char property[static 1],
-        const char namespace[static 1]) {
+libze_be_prop_get(libze_handle *lzeh, char *result_prop, const char *property,
+                  const char *namespace) {
     nvlist_t *lookup_prop = NULL;
 
     char prop_buf[ZFS_MAXPROPLEN] = "";
@@ -231,7 +231,7 @@ libze_get_be_prop(libze_handle *lzeh, char result_prop[ZFS_MAXPROPLEN], const ch
  * @pre @p namespace != NULL
  */
 libze_error
-libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]) {
+libze_be_props_get(libze_handle *lzeh, nvlist_t **result, const char *namespace) {
     nvlist_t *user_props = NULL;
     nvlist_t *filtered_user_props = NULL;
     libze_error ret = LIBZE_ERROR_SUCCESS;
@@ -346,12 +346,12 @@ libze_error_clear(libze_handle *lzeh) {
  * @post if @a lzeh->ze_props contains an existing org.zectl:bootloader,
  *            the bootloader plugin is initialized.
  */
-static libze_error
-check_for_bootloader(libze_handle *lzeh) {
+libze_error
+libze_bootloader_set(libze_handle *lzeh) {
     char plugin[ZFS_MAXPROPLEN] = "";
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    ret = libze_get_be_prop(lzeh, plugin, "bootloader", ZE_PROP_NAMESPACE);
+    ret = libze_be_prop_get(lzeh, plugin, "bootloader", ZE_PROP_NAMESPACE);
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
@@ -361,7 +361,14 @@ check_for_bootloader(libze_handle *lzeh) {
         return LIBZE_ERROR_SUCCESS;
     }
 
-    void *p_handle = libze_plugin_open(plugin);
+    void *p_handle = NULL;
+    libze_plugin_manager_error p_ret = libze_plugin_open(plugin, &p_handle);
+
+    if (p_ret == LIBZE_PLUGIN_MANAGER_ERROR_EEXIST) {
+        return libze_error_set(lzeh, LIBZE_ERROR_PLUGIN_EEXIST,
+                "Plugin %s doesn't exist\n", plugin);
+    }
+
     if (p_handle == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_PLUGIN,
                 "Failed to open plugin %s\n", plugin);
@@ -431,11 +438,11 @@ libze_handle_rep_check_init(libze_handle *lzeh) {
  *         @p LIBZE_ERROR_MAXPATHLEN if @p bootpool too long
  */
 libze_error
-libze_set_boot_pool(libze_handle *lzeh) {
+libze_boot_pool_set(libze_handle *lzeh) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
     char boot_pool[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if ((ret = libze_get_be_prop(lzeh, boot_pool, "bootpool", ZE_PROP_NAMESPACE)) != LIBZE_ERROR_SUCCESS) {
+    if ((ret = libze_be_prop_get(lzeh, boot_pool, "bootpool", ZE_PROP_NAMESPACE)) != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
 
@@ -514,19 +521,17 @@ libze_init(void) {
         goto err;
     }
 
-    if (libze_get_be_props(lzeh, &lzeh->ze_props, ZE_PROP_NAMESPACE) != 0) {
+    if (libze_be_props_get(lzeh, &lzeh->ze_props, ZE_PROP_NAMESPACE) != 0) {
         goto err;
     }
 
-    if (check_for_bootloader(lzeh) != 0) {
-        goto err;
-    }
+    // Clear bootloader
+    lzeh->lz_funcs = NULL;
 
     // Clear bootpool
     lzeh->bootpool.lzbph = NULL;
     (void) strlcpy(lzeh->bootpool.boot_pool_root, "", ZFS_MAX_DATASET_NAME_LEN);
-
-    // Clear any error messages
+    
     (void) libze_error_clear(lzeh);
 
     assert(libze_handle_rep_check_init(lzeh) == 0);

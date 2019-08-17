@@ -20,7 +20,8 @@ typedef enum libze_error {
     LIBZE_ERROR_NOMEM,
     LIBZE_ERROR_EEXIST,         /* Dataset/fs/snapshot doesn't exist */
     LIBZE_ERROR_MAXPATHLEN,     /* Dataset/fs/snapshot exceeds LIBZE_MAXPATHLEN */
-    LIBZE_ERROR_PLUGIN
+    LIBZE_ERROR_PLUGIN,
+    LIBZE_ERROR_PLUGIN_EEXIST
 } libze_error;
 
 typedef struct libze_handle libze_handle;
@@ -83,7 +84,7 @@ void
 libze_fini(libze_handle *lzeh);
 
 libze_error
-libze_set_boot_pool(libze_handle *lzeh);
+libze_boot_pool_set(libze_handle *lzeh);
 
 libze_error
 libze_list(libze_handle *lzeh, nvlist_t **outnvl);
@@ -146,17 +147,21 @@ libze_error
 libze_error_set(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...);
 libze_error
 libze_error_nomem(libze_handle *lzeh);
+libze_error
+libze_error_clear(libze_handle *lzeh);
 
 libze_error
-libze_set_default_props(libze_handle *lzeh, nvlist_t *default_prop, const char namespace[static 1]);
+libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop, const char *namespace);
 libze_error
-libze_add_default_prop(nvlist_t **prop_out, const char name[static 3], const char value[static 1],
+libze_default_prop_add(nvlist_t **prop_out, const char *name, const char *value,
                        const char *namespace);
+libze_error
+libze_bootloader_set(libze_handle *lzeh);
 
 libze_error
-libze_get_be_props(libze_handle *lzeh, nvlist_t **result, const char namespace[static 1]);
+libze_be_props_get(libze_handle *lzeh, nvlist_t **result, const char *namespace);
 libze_error
-libze_get_be_prop(libze_handle *lzeh, char result_prop[ZFS_MAXPROPLEN], const char property[static 1],
-                  const char namespace[static 1]);
+libze_be_prop_get(libze_handle *lzeh, char *result_prop, const char *property,
+                  const char *namespace);
 
 #endif //ZECTL_LIBZE_H

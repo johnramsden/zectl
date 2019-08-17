@@ -78,12 +78,12 @@ define_default_props(libze_handle *lzeh) {
     if ((default_props = fnvlist_alloc()) == NULL) {
         return -1;
     }
-    if ((libze_add_default_prop(&default_props, "bootloader", "", ZE_PROP_NAMESPACE) != 0) ||
-        (libze_add_default_prop(&default_props, "bootpool", "", ZE_PROP_NAMESPACE) != 0)) {
+    if ((libze_default_prop_add(&default_props, "bootloader", "", ZE_PROP_NAMESPACE) != 0) ||
+        (libze_default_prop_add(&default_props, "bootpool", "", ZE_PROP_NAMESPACE) != 0)) {
         return -1;
     }
 
-    if (libze_set_default_props(lzeh, default_props, ZE_PROP_NAMESPACE) != 0) {
+    if (libze_default_props_set(lzeh, default_props, ZE_PROP_NAMESPACE) != 0) {
         nvlist_free(default_props);
         return -1;
     }
@@ -145,7 +145,27 @@ main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (libze_set_boot_pool(lzeh) != LIBZE_ERROR_SUCCESS) {
+    ret = libze_bootloader_set(lzeh);
+    if ((ret != LIBZE_ERROR_SUCCESS) && (ret != LIBZE_ERROR_PLUGIN_EEXIST)) {
+        fputs(lzeh->libze_error_message, stderr);
+        return EXIT_FAILURE;
+    }
+
+    // Clear any error messages
+    if (ret == LIBZE_ERROR_PLUGIN_EEXIST) {
+        char plugin[ZFS_MAXPROPLEN] = "";
+        ret = libze_be_prop_get(lzeh, plugin, "bootloader", ZE_PROP_NAMESPACE);
+        if (ret != LIBZE_ERROR_SUCCESS) {
+            fputs(lzeh->libze_error_message, stderr);
+            return EXIT_FAILURE;
+        }
+        fprintf(stderr,
+                "No bootloader plugin found under bootloader=%s.\n"
+                       "Continuing with no bootloader plugin.\n", plugin);
+        (void) libze_error_clear(lzeh);
+    }
+
+    if (libze_boot_pool_set(lzeh) != LIBZE_ERROR_SUCCESS) {
         fputs(lzeh->libze_error_message, stderr);
         ret = EXIT_FAILURE;
         goto fin;
