@@ -1,12 +1,17 @@
+#include "libze/libze.h"
+#include "libze/libze_util.h"
+#include "libze/libze_plugin_manager.h"
+
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+
 #include <sys/nvpair.h>
 #include <libzfs_core.h>
+#include <dirent.h>
 
-#include "libze/libze_plugin_manager.h"
-#include "libze/libze.h"
-#include "libze/libze_util.h"
+#include <sys/types.h>
+#include <sys/stat.h>
 
 // Unsigned long long is 64 bits or more
 #define ULL_SIZE 128
@@ -531,7 +536,7 @@ libze_init(void) {
     // Clear bootpool
     lzeh->bootpool.lzbph = NULL;
     (void) strlcpy(lzeh->bootpool.boot_pool_root, "", ZFS_MAX_DATASET_NAME_LEN);
-    
+
     (void) libze_error_clear(lzeh);
 
     assert(libze_handle_rep_check_init(lzeh) == 0);
@@ -1678,5 +1683,196 @@ libze_set(libze_handle *lzeh, nvlist_t *properties) {
     }
 
     zfs_close(be_root_zh);
+    return ret;
+}
+
+
+/*********************************
+ ************** Mount **************
+ *********************************/
+
+typedef struct libze_mount_cb_data {
+    libze_handle *lzeh;
+    const char *mountpoint;
+} libze_mount_cb_data;
+
+/**
+ * @brief Create a directory
+ * @param path Path of directory to create if it doesn't exist
+ * @return non-zero on failure.
+ */
+static int
+directory_create_if_nonexistent(const char path[static 1]) {
+    DIR* dir = opendir(path);
+    if (dir != NULL) {
+        // Directory exists
+        return closedir(dir);
+    }
+
+    return mkdir(path, 0700);
+}
+
+/**
+ * @brief Mount callback called for each child of boot environment
+ * @param zh Handle to current dataset to mount
+ * @param data @p libze_mount_cb_data object
+ * @return Non-zero on failure.
+ */
+static int
+mount_callback(zfs_handle_t *zh, void *data) {
+    libze_mount_cb_data *cbd = data;
+    const char *dataset = zfs_get_name(zh);
+    char prop_buf[ZFS_MAXPROPLEN];
+
+    // Get mountpoint
+    if (zfs_prop_get(zh, ZFS_PROP_MOUNTPOINT, prop_buf,
+            sizeof(prop_buf), NULL, NULL, 0, 1) != 0) {
+        (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to get mountpoint for %s\n.", dataset);
+        return -1;
+    }
+
+    // No mountpoint, just for heirarchy, or not ZFS managed so skip
+    if ((strcmp(prop_buf, "none") == 0) || (strcmp(prop_buf, "legacy") == 0)) {
+        return zfs_iter_filesystems(zh, mount_callback, cbd);
+    }
+
+    char mountpoint_buf[LIBZE_MAX_PATH_LEN];
+    if (libze_util_concat(cbd->mountpoint, "", prop_buf,
+            LIBZE_MAX_PATH_LEN, mountpoint_buf) >= LIBZE_MAX_PATH_LEN) {
+        (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Exceeded max path length for mount\n.");
+        return -1;
+    }
+
+    if (zfs_is_mounted(zh, NULL)) {
+        (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Dataset %s is already mounted\n", dataset);
+        return -1;
+    }
+
+    if (directory_create_if_nonexistent(mountpoint_buf) != 0) {
+        (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Failed to create mountpoint %s for %s, or a file existed there\n.",
+                mountpoint_buf, dataset);
+        return -1;
+    }
+
+    if (libze_util_temporary_mount(dataset, mountpoint_buf) != LIBZE_ERROR_SUCCESS) {
+        (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to mount %s to %s.\n", dataset, mountpoint_buf);
+        return -1;
+    }
+
+    return zfs_iter_filesystems(zh, mount_callback, cbd);
+}
+
+/**
+ * @brief Recursively mount boot environment
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] boot_environment Boot environment to mount
+ * @param[in] mountpoint Mountpoint for boot environment.
+ *            If @p NULL a temporary mountpoint will be created
+ * @param[in] mountpoint_buffer Mountpoint boot environment was mounted to.
+ *            If @p mountpoint was @p NULL, the temporary mountpoint will be here.
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN if a path length exceeded,
+ *         @p LIBZE_ERROR_ZFS_OPEN if a dataset handle can't be opened,
+ *         @p LIBZE_ERROR_UNKNOWN if failure to set properties
+ */
+libze_error
+libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
+            const char *mountpoint, char mountpoint_buffer[LIBZE_MAX_PATH_LEN]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    const char *real_mountpoint;
+    char dataset_buffer[ZFS_MAX_DATASET_NAME_LEN];
+
+    if (libze_util_concat(lzeh->be_root, "/", boot_environment,
+            ZFS_MAX_DATASET_NAME_LEN, dataset_buffer) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested boot environment %s exceeds max length %d\n",
+                boot_environment, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Requested boot environment %s doesn't exist\n",
+                boot_environment);
+    }
+
+    if (libze_is_root_be(lzeh, dataset_buffer)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Cannot mount root boot environment %s\n",
+                boot_environment);
+    }
+
+    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM);
+    if (be_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Failed to open boot environment %s\n", boot_environment);
+    }
+
+    if (zfs_is_mounted(be_zh, NULL)) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Boot environment dataset for %s is already mounted\n", boot_environment);
+        goto err;
+    }
+
+    char tmpdir_template[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat("/tmp/ze.", boot_environment, ".XXXXXX",
+            ZFS_MAX_DATASET_NAME_LEN, tmpdir_template) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Could not create directory template\n");
+        goto err;
+    }
+
+    boolean_t tmpdir_created = B_FALSE;
+    if (mountpoint == NULL) {
+        // Create tmp mountpoint
+        real_mountpoint = mkdtemp(tmpdir_template);
+        if (real_mountpoint == NULL) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                    "Could not create tmp directory %s\n", tmpdir_template);
+            goto err;
+        }
+        tmpdir_created = B_TRUE;
+    } else {
+        real_mountpoint = mountpoint;
+    }
+
+    if (strlcpy(mountpoint_buffer, real_mountpoint, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Mountpoint exceeds max length\n");
+        goto err;
+    }
+
+    if (libze_util_temporary_mount(dataset_buffer, real_mountpoint) != LIBZE_ERROR_SUCCESS) {
+        if (tmpdir_created) {
+            (void) rmdir(real_mountpoint);
+        }
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to mount %s to %s.\n", boot_environment, real_mountpoint);
+        goto err;
+    }
+
+    libze_mount_cb_data cbd = {
+            .lzeh = lzeh,
+            .mountpoint = real_mountpoint
+    };
+
+    if (zfs_iter_filesystems(be_zh, mount_callback, &cbd) != 0) {
+        ret = lzeh->libze_error;
+        goto err;
+    }
+
+    if (lzeh->bootpool.lzbph != NULL) {
+        if (zfs_iter_filesystems(lzeh->bootpool.lzbph, mount_callback, &cbd) != 0) {
+            ret = -1;
+            goto err;
+        }
+    }
+
+err:
+    zfs_close(be_zh);
     return ret;
 }

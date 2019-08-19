@@ -1,13 +1,17 @@
-//
-// Created by john on 12/28/18.
-//
-
 #ifndef ZECTL_LIBZE_H
 #define ZECTL_LIBZE_H
+
+// Required for spl stat.h
+#define __USE_LARGEFILE64
+#define _LARGEFILE_SOURCE
+#define _LARGEFILE64_SOURCE
 
 #include <libzfs/libzfs.h>
 
 #define LIBZE_MAX_ERROR_LEN    1024
+
+// 255 in case mounted on non-ZFS
+#define LIBZE_MAX_PATH_LEN    255
 
 extern const char *ZE_PROP_NAMESPACE;
 
@@ -137,6 +141,9 @@ libze_error
 libze_create(libze_handle *lzeh, libze_create_options *options);
 libze_error
 libze_set(libze_handle *lzeh, nvlist_t *properties);
+libze_error
+libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
+        const char *mountpoint, char mountpoint_buffer[LIBZE_MAX_PATH_LEN]);
 
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]);

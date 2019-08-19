@@ -1,7 +1,8 @@
+#include <string.h>
+#include <sys/mount.h>
+
 #include "libze/libze.h"
 #include "system_linux.h"
-#include <string.h>
-
 /**
  * @brief Concatenate two strings with a separator
  * @param[in] prefix Prefix string
@@ -183,4 +184,17 @@ libze_get_root_dataset(libze_handle *lzeh) {
 
     zfs_close(zh);
     return ret;
+}
+
+libze_error
+libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN], const char mountpoint[static 2]) {
+    const char *mount_settings = "zfsutil";
+    const char *mount_type = "zfs";
+    const unsigned long mount_flags = 0;
+
+    if (mount(dataset, mountpoint, mount_type, mount_flags, mount_settings) != 0) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
+    return LIBZE_ERROR_SUCCESS;
 }
