@@ -144,6 +144,8 @@ libze_set(libze_handle *lzeh, nvlist_t *properties);
 libze_error
 libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
         const char *mountpoint, char mountpoint_buffer[LIBZE_MAX_PATH_LEN]);
+libze_error
+libze_unmount(libze_handle *lzeh, const char boot_environment[static 1]);
 
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]);

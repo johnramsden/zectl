@@ -7,7 +7,7 @@ set(SOURCE_FILES
         zectl_activate.c
         zectl_destroy.c
         zectl_mount.c
-        zectl_umount.c
+        zectl_unmount.c
         zectl_rename.c
         zectl_set.c
         zectl_get.c

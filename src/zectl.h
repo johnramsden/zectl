@@ -30,6 +30,9 @@ libze_error
 ze_mount(libze_handle *lzeh, int argc, char **argv);
 
 libze_error
+ze_unmount(libze_handle *lzeh, int argc, char **argv);
+
+libze_error
 ze_set(libze_handle *lzeh, int argc, char **argv);
 
 #endif //ZECTL_ZECTL_H

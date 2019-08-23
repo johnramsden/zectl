@@ -1876,3 +1876,106 @@ err:
     zfs_close(be_zh);
     return ret;
 }
+
+/*********************************
+ ************** Umount **************
+ *********************************/
+
+typedef struct libze_umount_cb_data {
+    libze_handle *lzeh;
+} libze_umount_cb_data;
+
+/**
+ * @brief Mount callback called for each child of boot environment
+ * @param zh Handle to current dataset to mount
+ * @param data @p libze_mount_cb_data object
+ * @return Non-zero on failure.
+ */
+static int
+unmount_callback(zfs_handle_t *zh, void *data) {
+    libze_mount_cb_data *cbd = data;
+    const char *dataset = zfs_get_name(zh);
+
+    if (zfs_iter_filesystems(zh, unmount_callback, cbd) != 0) {
+        (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to iterate over %s\n.", dataset);
+        return -1;
+    }
+
+    if (!zfs_is_mounted(zh, NULL)) {
+        return 0;
+    }
+
+    if (zfs_unmount(zh, NULL, 0) != 0) {
+        (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to unmount %s\n.", dataset);
+        return -1;
+    }
+    return 0;
+}
+
+/**
+ * @brief Recursively unmount boot environment
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] boot_environment Boot environment to unmount
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN if a path length exceeded,
+ *         @p LIBZE_ERROR_ZFS_OPEN if a dataset handle can't be opened,
+ *         @p LIBZE_ERROR_UNKNOWN if failure to set properties
+ */
+libze_error
+libze_unmount(libze_handle *lzeh, const char boot_environment[static 1]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    char dataset_buffer[ZFS_MAX_DATASET_NAME_LEN];
+
+    if (libze_util_concat(lzeh->be_root, "/", boot_environment,
+            ZFS_MAX_DATASET_NAME_LEN, dataset_buffer) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested boot environment %s exceeds max length %d\n",
+                boot_environment, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Requested boot environment %s doesn't exist\n",
+                boot_environment);
+    }
+
+    if (libze_is_root_be(lzeh, dataset_buffer)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Cannot umount root boot environment %s\n",
+                boot_environment);
+    }
+
+    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM);
+    if (be_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Failed to open boot environment %s\n", boot_environment);
+    }
+
+    if (!zfs_is_mounted(be_zh, NULL)) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                "Boot environment dataset for %s is not mounted\n", boot_environment);
+        goto err;
+    }
+
+    libze_umount_cb_data cbd = {
+            .lzeh = lzeh
+    };
+
+    if (lzeh->bootpool.lzbph != NULL) {
+        if (unmount_callback(lzeh->bootpool.lzbph, &cbd) != 0) {
+            ret = lzeh->libze_error;
+            goto err;
+        }
+    }
+
+    if (unmount_callback(be_zh, &cbd) != 0) {
+        ret = lzeh->libze_error;
+        goto err;
+    }
+
+err:
+    zfs_close(be_zh);
+    return ret;
+}
