@@ -34,9 +34,7 @@ ze_mount(libze_handle *lzeh, int argc, char **argv) {
 
     const char *boot_environment = argv[0];
     char mountpoint_buffer[LIBZE_MAX_PATH_LEN];
-    if ((ret = libze_mount(lzeh, boot_environment, mountpoint, mountpoint_buffer)) != LIBZE_ERROR_SUCCESS) {
-        fputs(lzeh->libze_error_message, stderr);
-    } else {
+    if ((ret = libze_mount(lzeh, boot_environment, mountpoint, mountpoint_buffer)) == LIBZE_ERROR_SUCCESS) {
         puts(mountpoint_buffer);
     }
 

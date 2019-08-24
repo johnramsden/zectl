@@ -35,9 +35,5 @@ ze_destroy(libze_handle *lzeh, int argc, char **argv) {
 
     options.be_name = argv[0];
 
-    if ((ret = libze_destroy(lzeh, &options)) != LIBZE_ERROR_SUCCESS) {
-        fputs(lzeh->libze_error_message, stderr);
-    }
-
-    return ret;
+    return libze_destroy(lzeh, &options);
 }

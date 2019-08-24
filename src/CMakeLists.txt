@@ -10,6 +10,7 @@ set(SOURCE_FILES
         zectl_unmount.c
         zectl_rename.c
         zectl_set.c
+        zectl_snapshot.c
         zectl_get.c
 )
 

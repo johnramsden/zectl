@@ -91,7 +91,7 @@ define_default_props(libze_handle *lzeh) {
     return 0;
 }
 
-#define NUM_COMMANDS 7 // Will be 9
+#define NUM_COMMANDS 10
 
 int
 main(int argc, char *argv[]) {
@@ -109,12 +109,12 @@ main(int argc, char *argv[]) {
             {"activate", ze_activate},
             {"create", ze_create},
             {"destroy", ze_destroy},
-//            {"get", ze_get},
+            {"get", ze_get},
             {"list",   ze_list},
             {"mount", ze_mount},
-//            {"rename", ze_rename},
+            {"rename", ze_rename},
             {"set", ze_set},
-//            {"snapshot", ze_snapshot},
+            {"snapshot", ze_snapshot},
             {"unmount", ze_unmount}
     };
 
@@ -191,8 +191,8 @@ main(int argc, char *argv[]) {
     libze_error ze_ret = ze_command(lzeh, ze_argc, ze_argv);
     if (ze_ret != LIBZE_ERROR_SUCCESS) {
         fprintf(stderr, "%s: Failed to run '%s %s'.\n", ZE_PROGRAM, ZE_PROGRAM, ze_argv[0]);
+        fputs(lzeh->libze_error_message, stderr);
         ret = EXIT_FAILURE;
-        goto fin;
     }
 
 fin:

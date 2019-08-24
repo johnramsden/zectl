@@ -65,9 +65,7 @@ ze_create(libze_handle *lzeh, int argc, char **argv) {
         }
     }
 
-    if ((ret = libze_create(lzeh, &be_clone)) != LIBZE_ERROR_SUCCESS) {
-        fputs(lzeh->libze_error_message, stderr);
-    }
+    ret = libze_create(lzeh, &be_clone);
 
 err:
     libze_bootloader_fini(&bootloader);

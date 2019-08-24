@@ -47,10 +47,6 @@ ze_activate(libze_handle *lzeh, int argc, char **argv) {
         return LIBZE_ERROR_UNKNOWN;
     }
 
-    if ((ret = libze_activate(lzeh, &options)) != LIBZE_ERROR_SUCCESS) {
-        fputs(lzeh->libze_error_message, stderr);
-    }
-
 err:
-    return ret;
+    return libze_activate(lzeh, &options);
 }

@@ -116,10 +116,8 @@ ze_set(libze_handle *lzeh, int argc, char **argv) {
         }
     }
 
-    if ((ret = libze_set(lzeh, properties)) != LIBZE_ERROR_SUCCESS) {
-        fputs(lzeh->libze_error_message, stderr);
-    }
-
+    ret = libze_set(lzeh, properties);
+    
 err:
     fnvlist_free(properties);
     return ret;

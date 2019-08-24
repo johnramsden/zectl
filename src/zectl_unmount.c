@@ -2,9 +2,7 @@
 
 libze_error
 ze_unmount(libze_handle *lzeh, int argc, char **argv) {
-    libze_error ret = LIBZE_ERROR_SUCCESS;
     int opt;
-
     opterr = 0;
 
     while ((opt = getopt(argc, argv, "")) != -1) {
@@ -25,10 +23,5 @@ ze_unmount(libze_handle *lzeh, int argc, char **argv) {
         return LIBZE_ERROR_UNKNOWN;
     }
 
-    if ((ret = libze_unmount(lzeh, argv[0])) != LIBZE_ERROR_SUCCESS) {
-        fputs(lzeh->libze_error_message, stderr);
-    }
-
-err:
-    return ret;
+    return libze_unmount(lzeh, argv[0]);
 }

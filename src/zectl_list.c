@@ -187,14 +187,10 @@ ze_list(libze_handle *lzeh, int argc, char **argv) {
         }
     }
 
-    libze_list(lzeh, &outnvl);
-
-    // List boot environments
-    print_bes(&outnvl, &options);
-
-err:
+    if ((ret = libze_list(lzeh, &outnvl)) == LIBZE_ERROR_SUCCESS) {
+        print_bes(&outnvl, &options);
+    }
 
     libze_list_free(outnvl);
-
     return ret;
 }
