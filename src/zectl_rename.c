@@ -1,24 +1,14 @@
 #include "zectl.h"
 
-// TODO
 libze_error
 ze_rename(libze_handle *lzeh, int argc, char **argv) {
-    libze_error ret = LIBZE_ERROR_SUCCESS;
     int opt;
-    libze_destroy_options options = {
-            .be_name = NULL,
-            .noconfirm = B_FALSE
-    };
-
     opterr = 0;
 
-    while ((opt = getopt(argc, argv, "y")) != -1) {
+    while ((opt = getopt(argc, argv, "")) != -1) {
         switch (opt) {
-            case 'y':
-                options.noconfirm = B_TRUE;
-                break;
             default:
-                fprintf(stderr, "%s destroy: unknown option '-%c'\n", ZE_PROGRAM, optopt);
+                fprintf(stderr, "%s rename: unknown option '-%c'\n", ZE_PROGRAM, optopt);
                 ze_usage();
                 return LIBZE_ERROR_UNKNOWN;
         }
@@ -27,18 +17,16 @@ ze_rename(libze_handle *lzeh, int argc, char **argv) {
     argc -= optind;
     argv += optind;
 
-    if (argc != 1) {
-        fprintf(stderr, "%s activate: wrong number of arguments\n", ZE_PROGRAM);
+    if (argc != 2) {
+        fprintf(stderr, "%s rename: wrong number of arguments\n", ZE_PROGRAM);
         ze_usage();
         return LIBZE_ERROR_UNKNOWN;
     }
 
-    options.be_name = argv[0];
+    if (strchr(argv[1], '/') == 0) {
+        fprintf(stderr, "%s rename: Boot environment name cannot contain '/'\n", ZE_PROGRAM);
+        return LIBZE_ERROR_UNKNOWN;
+    }
 
-//    if ((ret = libze_destroy(lzeh, &options)) != LIBZE_ERROR_SUCCESS) {
-//        fputs(lzeh->libze_error_message, stderr);
-//    }
-
-err:
-    return ret;
+    return libze_rename(lzeh, argv[0], argv[1]);
 }

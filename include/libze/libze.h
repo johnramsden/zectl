@@ -147,6 +147,10 @@ libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
         const char *mountpoint, char mountpoint_buffer[LIBZE_MAX_PATH_LEN]);
 
 libze_error
+libze_rename(libze_handle *lzeh, const char boot_environment[static 1],
+             const char new_boot_environment[static 1]);
+
+libze_error
 libze_set(libze_handle *lzeh, nvlist_t *properties);
 
 libze_error
