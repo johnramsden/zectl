@@ -9,6 +9,8 @@
 #include "libze/libze_util.h"
 #include "libze/libze_plugin_manager.h"
 
+#define HEADER_SPACING   2
+
 extern const char *ZE_PROGRAM;
 
 void
