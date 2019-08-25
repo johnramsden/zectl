@@ -140,9 +140,6 @@ libze_error
 libze_destroy(libze_handle *lzeh, libze_destroy_options *options);
 
 libze_error
-libze_get(libze_handle *lzeh, nvlist_t *properties);
-
-libze_error
 libze_list(libze_handle *lzeh, nvlist_t **outnvl);
 
 libze_error
@@ -151,6 +148,9 @@ libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
 
 libze_error
 libze_set(libze_handle *lzeh, nvlist_t *properties);
+
+libze_error
+libze_snapshot(libze_handle *lzeh, const char boot_environment[static 1]);
 
 libze_error
 libze_unmount(libze_handle *lzeh, const char boot_environment[static 1]);

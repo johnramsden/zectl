@@ -588,10 +588,13 @@ libze_handle_rep_check_init(libze_handle *lzeh) {
         (void) strlcat(check_failure, "Lengths of strings incorrect\n", LIBZE_MAX_ERROR_LEN);
         ret++;
     }
-
     if ((lzeh->libze_error != LIBZE_ERROR_SUCCESS) || (strlen(lzeh->libze_error_message) != 0)) {
         (void) strlcat(check_failure, "Errors not cleared\n", LIBZE_MAX_ERROR_LEN);
         ret++;
+    }
+
+    if (ret != 0) {
+        (void) libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, check_failure);
     }
 
     return ret;
@@ -2036,6 +2039,98 @@ libze_set(libze_handle *lzeh, nvlist_t *properties) {
     }
 
     zfs_close(be_root_zh);
+    return ret;
+}
+
+/*************************************
+ ************** Snapshot **************
+ *************************************/
+
+/**
+ * @brief Take a snapshot of boot pool dataset
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] boot_environment Boot environment name to snapshot boot pool dataset for
+ * @param[in] snap_suffix Snapshot name
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN if max dataset or snapshot length exceeded,
+ *         @p LIBZE_ERROR_EEXIST if boot pool dataset nonexsistent
+ */
+static libze_error
+snapshot_boot_pool(libze_handle *lzeh, const char boot_environment[static 1],
+                   const char snap_suffix[ZFS_MAX_DATASET_NAME_LEN]) {
+    char boot_pool_buf[ZFS_MAX_DATASET_NAME_LEN];
+    char snap_buf[ZFS_MAX_DATASET_NAME_LEN];
+
+    if (libze_util_concat(zfs_get_name(lzeh->bootpool.lzbph), "/env/",
+            boot_environment, ZFS_MAX_DATASET_NAME_LEN, boot_pool_buf) >= ZFS_MAX_DATASET_NAME_LEN) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested dataset for boot pool exceeds max length \n");
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, boot_pool_buf, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Requested dataset %s for boot pool doesn't exist\n", boot_pool_buf);
+    }
+
+    if (libze_util_concat(boot_pool_buf, "@",
+            snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf) >= ZFS_MAX_DATASET_NAME_LEN) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested snapshot for boot pool exceeds max length \n");
+    }
+
+    if (zfs_snapshot(lzeh->lzh, snap_buf, B_TRUE, NULL) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Failed to take snapshot %s\n", snap_buf);
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+/**
+ * @brief Take a snapshot of a boot environment
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] boot_environment Boot environment name to snapshot
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN if max dataset or snapshot length exceeded,
+ *         @p LIBZE_ERROR_EEXIST if a datataset to snapshot is nonexsistent
+ */
+libze_error
+libze_snapshot(libze_handle *lzeh, const char boot_environment[static 1]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char dataset_buffer[ZFS_MAX_DATASET_NAME_LEN];
+
+    if (libze_util_concat(lzeh->be_root, "/", boot_environment,
+            ZFS_MAX_DATASET_NAME_LEN, dataset_buffer) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested boot environment %s exceeds max length %d\n",
+                boot_environment, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                "Requested boot environment %s doesn't exist\n",
+                boot_environment);
+    }
+
+    char snap_buf[ZFS_MAX_DATASET_NAME_LEN];
+    char snap_suffix[ZFS_MAX_DATASET_NAME_LEN];
+    (void) gen_snap_suffix(ZFS_MAX_DATASET_NAME_LEN, snap_suffix);
+    if (libze_util_concat(dataset_buffer, "@",
+            snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf) >= ZFS_MAX_DATASET_NAME_LEN) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested snapshot exceeds max length \n");
+    }
+
+    if (zfs_snapshot(lzeh->lzh, snap_buf, B_TRUE, NULL) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Failed to take snapshot %s\n", snap_buf);
+    }
+
+    if (lzeh->bootpool.lzbph != NULL) {
+        ret = snapshot_boot_pool(lzeh, boot_environment, snap_suffix);
+    }
+
     return ret;
 }
 

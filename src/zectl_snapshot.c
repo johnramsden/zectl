@@ -7,7 +7,8 @@ ze_snapshot(libze_handle *lzeh, int argc, char **argv) {
 
     opterr = 0;
 
-    while ((opt = getopt(argc, argv, "y")) != -1) {
+    // Options may be added
+    while ((opt = getopt(argc, argv, "")) != -1) {
         switch (opt) {
             default:
                 fprintf(stderr, "%s snapshot: unknown option '-%c'\n", ZE_PROGRAM, optopt);
@@ -20,11 +21,10 @@ ze_snapshot(libze_handle *lzeh, int argc, char **argv) {
     argv += optind;
 
     if (argc != 1) {
-        fprintf(stderr, "%s activate: wrong number of arguments\n", ZE_PROGRAM);
+        fprintf(stderr, "%s snapshot: wrong number of arguments\n", ZE_PROGRAM);
         ze_usage();
         return LIBZE_ERROR_UNKNOWN;
     }
 
-
-    return ret;
+    return libze_snapshot(lzeh, argv[0]);
 }
