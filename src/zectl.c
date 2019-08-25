@@ -160,7 +160,7 @@ main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
         fprintf(stderr,
-                "No bootloader plugin found under bootloader=%s.\n"
+                "WARNING: No bootloader plugin found under bootloader=%s.\n"
                        "Continuing with no bootloader plugin.\n", plugin);
         (void) libze_error_clear(lzeh);
     }
