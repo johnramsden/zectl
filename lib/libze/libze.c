@@ -152,11 +152,19 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
         char *nvp_name = nvpair_name(pair);
         char buf[ZFS_MAXPROPLEN];
 
+        // Make sure namespace ends
+        if ((strlen(nvp_name)+1) < (strlen(namespace)+1)) {
+            char after_namespace = nvp_name[strlen(namespace)+1];
+            if ((after_namespace != '.') && (after_namespace != ':')) {
+                continue;
+            }
+        }
+
         if (libze_util_cut(nvp_name, ZFS_MAXPROPLEN, buf, ':') != 0) {
             return LIBZE_ERROR_UNKNOWN;
         }
 
-        if (strcmp(buf, namespace) == 0) {
+        if (strncmp(buf, namespace, strlen(namespace)) == 0) {
             nvlist_add_nvpair(*result_nvl, pair);
         }
     }
