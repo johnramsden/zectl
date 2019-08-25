@@ -12,7 +12,7 @@ set(SOURCE_FILES
         zectl_set.c
         zectl_snapshot.c
         zectl_get.c
-)
+        zectl_util.h zectl_util.c)
 
 list(APPEND ZE_LINK_LIBRARIES
         libze libze_plugin_systemdboot)

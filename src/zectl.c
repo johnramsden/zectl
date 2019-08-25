@@ -36,7 +36,7 @@ ze_usage(void) {
     printf("%s list\n", ZE_PROGRAM);
     printf("%s mount <boot environment>\n", ZE_PROGRAM);
     printf("%s rename <boot environment> <boot environment>\n", ZE_PROGRAM);
-    printf("%s set <property=value> <boot environment>\n", ZE_PROGRAM);
+    printf("%s set <property=value>\n", ZE_PROGRAM);
     printf("%s snapshot <boot environment>@<snap>\n", ZE_PROGRAM);
     printf("%s unmount <boot environment>\n", ZE_PROGRAM);
 }

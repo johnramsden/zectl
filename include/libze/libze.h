@@ -91,9 +91,6 @@ libze_error
 libze_boot_pool_set(libze_handle *lzeh);
 
 libze_error
-libze_list(libze_handle *lzeh, nvlist_t **outnvl);
-
-libze_error
 libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suffix[static 1], char be[static 1],
             boolean_t recursive);
 
@@ -135,15 +132,26 @@ typedef struct libze_create_options {
 
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options);
-libze_error
-libze_destroy(libze_handle *lzeh, libze_destroy_options *options);
+
 libze_error
 libze_create(libze_handle *lzeh, libze_create_options *options);
+
 libze_error
-libze_set(libze_handle *lzeh, nvlist_t *properties);
+libze_destroy(libze_handle *lzeh, libze_destroy_options *options);
+
+libze_error
+libze_get(libze_handle *lzeh, nvlist_t *properties);
+
+libze_error
+libze_list(libze_handle *lzeh, nvlist_t **outnvl);
+
 libze_error
 libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
         const char *mountpoint, char mountpoint_buffer[LIBZE_MAX_PATH_LEN]);
+
+libze_error
+libze_set(libze_handle *lzeh, nvlist_t *properties);
+
 libze_error
 libze_unmount(libze_handle *lzeh, const char boot_environment[static 1]);
 
@@ -164,6 +172,12 @@ libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop, const char *
 libze_error
 libze_default_prop_add(nvlist_t **prop_out, const char *name, const char *value,
                        const char *namespace);
+
+libze_error
+libze_add_set_property(nvlist_t *properties, const char *property);
+libze_error
+libze_add_get_property(libze_handle *lzeh, nvlist_t **properties, const char *property);
+
 libze_error
 libze_bootloader_set(libze_handle *lzeh);
 

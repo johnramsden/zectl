@@ -1,12 +1,11 @@
 #include "zectl.h"
+#include "zectl_util.h"
 
 #define HEADER_NAME       "Name"
 #define HEADER_ACTIVE     "Active"
 #define HEADER_MOUNTPOINT "Mountpoint"
 #define HEADER_SPACEUSED  "Space"
 #define HEADER_CREATION   "Creation"
-
-#define HEADER_SPACING   2
 
 typedef struct list_value_widths {
     size_t name;
@@ -23,42 +22,13 @@ typedef struct list_options {
     boolean_t tab_delimited;
 } list_options_t;
 
-static size_t
-number_length(long number) {
-            assert(number >= 0);
-
-    size_t length = 1;
-    long divided_num = number;
-
-    while ((divided_num = divided_num/10) > 0) {
-        length++;
-    }
-
-    return length;
-}
-
-static int
-set_column_width(nvlist_t *be_props, size_t *width_column, char *property) {
-    char *string_prop;
-    size_t item_width;
-    if (nvlist_lookup_string(be_props, property, &string_prop) != 0) {
-        return -1;
-    }
-    item_width = strlen(string_prop);
-    if (item_width > *width_column) {
-        *width_column = item_width;
-    }
-
-    return 0;
-}
-
 static int
 compute_column_widths(nvlist_t *be_props, list_options_t *options, list_value_widths_t *widths) {
     int active_width = 0;
 
-    if ((set_column_width(be_props, &widths->name, "name") != 0) ||
-        (set_column_width(be_props, &widths->creation, "creation") != 0) ||
-        (set_column_width(be_props, &widths->mountpoint, "mountpoint") != 0)) {
+    if ((set_column_width_lookup(be_props, &widths->name, "name") != 0) ||
+        (set_column_width_lookup(be_props, &widths->creation, "creation") != 0) ||
+        (set_column_width_lookup(be_props, &widths->mountpoint, "mountpoint") != 0)) {
         return -1;
     }
 
