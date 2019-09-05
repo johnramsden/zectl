@@ -349,11 +349,11 @@ libze_be_prop_get(libze_handle *lzeh, char *result_prop, const char *property,
     char prop_buf[ZFS_MAXPROPLEN] = "";
     if (libze_util_concat(namespace, ":", property, ZFS_MAXPROPLEN, prop_buf) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Exceeded length of property.\n");
+            "Exceeded length of property.\n");
     }
 
     if (nvlist_lookup_nvlist(lzeh->ze_props, prop_buf, &lookup_prop) != 0) {
-        (void ) strlcpy(result_prop, "", ZFS_MAXPROPLEN);
+    (void ) strlcpy(result_prop, "", ZFS_MAXPROPLEN);
         return LIBZE_ERROR_SUCCESS;
     }
 
@@ -361,18 +361,18 @@ libze_be_prop_get(libze_handle *lzeh, char *result_prop, const char *property,
     // Should always have a value if set correctly
     if (nvlist_lookup_nvpair(lookup_prop, "value", &prop) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Property nvlist set incorrectly.\n");
+            "Property nvlist set incorrectly.\n");
     }
 
     char *string_prop = NULL;
     if (nvpair_value_string(prop, &string_prop) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Property nvlist value is wrong type. Should be a string.\n");
+    return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+            "Property nvlist value is wrong type. Should be a string.\n");
     }
 
     if (strlcpy(result_prop, string_prop, ZFS_MAXPROPLEN) >= ZFS_MAXPROPLEN) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Property is too large.\n");
+            "Property is too large.\n");
     }
 
     return LIBZE_ERROR_SUCCESS;
