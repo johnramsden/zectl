@@ -866,7 +866,7 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
 
     // mid_activate
     if ((lzeh->lz_funcs != NULL) &&
-        (lzeh->lz_funcs->plugin_mid_activate(lzeh, tmp_dirname) != 0)) {
+        (lzeh->lz_funcs->plugin_mid_activate(lzeh, tmp_dirname, options->be_name) != 0)) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN,
                 "Failed to run mid-activate hook\n");
         goto err;

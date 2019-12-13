@@ -1,5 +1,7 @@
 #include <dlfcn.h>
 #include <string.h>
+#include "libze/libze.h"
+#include "libze/libze_util.h"
 
 #include "libze/libze_plugin_manager.h"
 
@@ -62,4 +64,23 @@ libze_plugin_export(void *libhandle, libze_plugin_fn_export **ze_export) {
     }
 
     return 0;
+}
+
+libze_plugin_manager_error
+libze_plugin_form_namespace(const char plugin_name[static 1], char buf[ZFS_MAXPROPLEN]) {
+    if (libze_util_concat(ZE_PROP_NAMESPACE, ".", plugin_name, ZFS_MAXPROPLEN, buf)
+        != LIBZE_ERROR_SUCCESS) {
+        return LIBZE_PLUGIN_MANAGER_ERROR_MAXPATHLEN;
+    }
+    return LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS;
+}
+
+libze_plugin_manager_error
+libze_plugin_form_property(const char plugin_prefix[static 1], const char plugin_suffix[static 1],
+                           char buf[ZFS_MAXPROPLEN]) {
+    if (libze_util_concat(plugin_prefix, ":", plugin_suffix, ZFS_MAXPROPLEN, buf)
+        != LIBZE_ERROR_SUCCESS) {
+        return LIBZE_PLUGIN_MANAGER_ERROR_MAXPATHLEN;
+    }
+    return LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS;
 }
