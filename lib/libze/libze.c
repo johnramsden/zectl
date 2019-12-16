@@ -831,7 +831,7 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
     }
     nvlist_add_string(props, "canmount", "noauto");
 
-    if (is_root) {
+    if (!is_root) {
         nvlist_add_string(props, "mountpoint", "/");
 
         // Not currently mounted

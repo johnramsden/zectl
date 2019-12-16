@@ -125,7 +125,7 @@ libze_plugin_systemdboot_pre_activate(libze_handle *lzeh) {
  */
 static libze_error
 form_boot_mountpoint_unit(libze_handle *lzeh, char boot_mountpoint[LIBZE_MAX_PATH_LEN],
-                          char unit_buf[LIBZE_MAX_PATH_LEN]) {
+                          char be_mountpoint[LIBZE_MAX_PATH_LEN], char unit_buf[LIBZE_MAX_PATH_LEN]) {
 
     if (strlen(boot_mountpoint) <= 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
@@ -138,7 +138,8 @@ form_boot_mountpoint_unit(libze_handle *lzeh, char boot_mountpoint[LIBZE_MAX_PAT
                 "Boot mountpoint exceeds max path length.\n");
     }
 
-    if ((strlcat(unit_buf, SYSTEMD_SYSTEM_UNIT_PATH, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+    if ((strlcat(unit_buf, be_mountpoint, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+        (strlcat(unit_buf, SYSTEMD_SYSTEM_UNIT_PATH, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
         (strlcat(unit_buf, "/", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
         (strlcat(unit_buf, tmp_boot_mountpoint_buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
         (strlcat(unit_buf, ".mount", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
@@ -351,7 +352,7 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
 
     /* Get path to boot.mount */
     char unit_buf[LIBZE_MAX_PATH_LEN];
-    ret = form_boot_mountpoint_unit(lzeh, boot_mountpoint, unit_buf);
+    ret = form_boot_mountpoint_unit(lzeh, boot_mountpoint, activate_data->be_mountpoint, unit_buf);
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
@@ -397,9 +398,14 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     }
 
     /* Create a tempfile to manipulate before replacing original */
+    char tmpfile_front[LIBZE_MAX_PATH_LEN];
     char tmpfile[LIBZE_MAX_PATH_LEN];
     interr = libze_util_concat(SYSTEMD_SYSTEM_UNIT_PATH, "/",
-            ".zectl-sdboot.XXXXXX", LIBZE_MAX_PATH_LEN, tmpfile);
+            "/.zectl-sdboot.XXXXXX", LIBZE_MAX_PATH_LEN, tmpfile_front);
+
+    interr = (interr != 0) ? interr : libze_util_concat(activate_data->be_mountpoint, "/",
+            tmpfile_front, LIBZE_MAX_PATH_LEN, tmpfile);
+
     if (interr != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                 "Temporary boot mount unit exceeds max path length.\n");
