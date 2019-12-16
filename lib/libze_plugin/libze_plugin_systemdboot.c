@@ -200,21 +200,12 @@ do_copy_file(libze_handle *lzeh, FILE *file, FILE *new_file)
  * @return @p LIBZE_ERROR_SUCCESS on success
  */
 static libze_error
-backup_file(libze_handle *lzeh, const char *filename)
+copy_file(libze_handle *lzeh, const char *filename, const char *new_filename)
 {
     FILE *file = NULL;
     FILE *new_file = NULL;
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    char new_filename[LIBZE_MAX_PATH_LEN];
-
-    int err = libze_util_concat(filename, ".",
-            "bak", LIBZE_MAX_PATH_LEN, new_filename);
-    if (err != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Backup boot mount unit exceeds max path length.\n");
-    }
 
     file = fopen(filename, "rb");
     if (file == NULL) {
@@ -236,20 +227,6 @@ err:
     }
 
     return ret;
-}
-
-static libze_error
-form_suffix_string(char suffix[LIBZE_MAX_PATH_LEN],
-                   char efi_mountpoint[LIBZE_MAX_PATH_LEN],
-                   char be[LIBZE_MAX_PATH_LEN]) {
-
-    if ((strlcat(suffix, efi_mountpoint, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-        (strlcat(suffix, "/env/", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-        (strlcat(suffix, be, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
-        return LIBZE_ERROR_MAXPATHLEN;
-    }
-
-    return LIBZE_ERROR_SUCCESS;
 }
 
 static libze_error
@@ -361,8 +338,17 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
         return ret;
     }
 
+    char new_filename[LIBZE_MAX_PATH_LEN];
+
+    int err = libze_util_concat(unit_buf, ".",
+            "bak", LIBZE_MAX_PATH_LEN, new_filename);
+    if (err != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Backup boot mount unit exceeds max path length.\n");
+    }
+
     /* backup unit */
-    if ((ret = backup_file(lzeh, unit_buf)) != LIBZE_ERROR_SUCCESS) {
+    if ((ret = copy_file(lzeh, unit_buf, new_filename)) != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
 
@@ -372,9 +358,13 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     char replace_suffix[LIBZE_MAX_PATH_LEN];
 
     /* Create 'What=' suffix and replacement suffix */
-    ret = form_suffix_string(suffix, efi_mountpoint, active_be);
-    ret = (ret != 0) ? ret : form_suffix_string(replace_suffix, efi_mountpoint, activate_data->be_name);
-    if (ret != 0) {
+    interr = libze_util_concat(efi_mountpoint, "/env/",
+            active_be, LIBZE_MAX_PATH_LEN, suffix);
+    if (interr != 0) {
+        interr = libze_util_concat(efi_mountpoint, "/env/",
+                activate_data->be_name, LIBZE_MAX_PATH_LEN, replace_suffix);
+    }
+    if (interr != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                 "Unit EFI path exceeds max path length.\n");
         goto err;
@@ -403,8 +393,10 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     interr = libze_util_concat(SYSTEMD_SYSTEM_UNIT_PATH, "/",
             "/.zectl-sdboot.XXXXXX", LIBZE_MAX_PATH_LEN, tmpfile_front);
 
-    interr = (interr != 0) ? interr : libze_util_concat(activate_data->be_mountpoint, "/",
+    if (interr != 0) {
+        interr = libze_util_concat(activate_data->be_mountpoint, "/",
             tmpfile_front, LIBZE_MAX_PATH_LEN, tmpfile);
+    }
 
     if (interr != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
@@ -470,8 +462,7 @@ libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, libze_activate_data *a
     char efi_mountpoint[ZFS_MAXPROPLEN];
 
     char namespace_buf[ZFS_MAXPROPLEN];
-    if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf)
-        != LIBZE_ERROR_SUCCESS) {
+    if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf) != LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                 "Exceeded max property name length.\n");
     }
@@ -489,7 +480,8 @@ libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, libze_activate_data *a
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
-    return 0;
+
+    return ret;
 }
 
 /**
