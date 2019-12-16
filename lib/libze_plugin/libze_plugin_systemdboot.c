@@ -199,19 +199,28 @@ do_copy_file(libze_handle *lzeh, FILE *file, FILE *new_file)
  * @return @p LIBZE_ERROR_SUCCESS on success
  */
 static libze_error
-copy_file(libze_handle *lzeh, const char *filename, const char *new_filename)
+backup_file(libze_handle *lzeh, const char *filename)
 {
     FILE *file = NULL;
     FILE *new_file = NULL;
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
+    char new_filename[LIBZE_MAX_PATH_LEN];
+
+    int err = libze_util_concat(filename, ".",
+            "bak", LIBZE_MAX_PATH_LEN, new_filename);
+    if (err != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Backup boot mount unit exceeds max path length.\n");
+    }
+
     file = fopen(filename, "rb");
     if (file == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to open %s", filename);
     }
 
-    new_file = fopen(new_filename, "wb");
+    new_file = fopen(new_filename, "w+b");
     if (new_file == NULL) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to open %s", new_filename);
         goto err;
@@ -323,10 +332,9 @@ copy_matched(libze_handle *lzeh,
  *                           @p LIBZE_ERROR_SUCCESS On success
  */
 static libze_error
-update_boot_unit(libze_handle *lzeh, char be_mountpoint[static 2],
+update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
                  char boot_mountpoint[LIBZE_MAX_PATH_LEN],
-                 char efi_mountpoint[LIBZE_MAX_PATH_LEN],
-                 char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
+                 char efi_mountpoint[LIBZE_MAX_PATH_LEN]) {
     /*
      * Update mount unit:
      * Where=/boot
@@ -352,6 +360,11 @@ update_boot_unit(libze_handle *lzeh, char be_mountpoint[static 2],
         return ret;
     }
 
+    /* backup unit */
+    if ((ret = backup_file(lzeh, unit_buf)) != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
     /* Setup regular expression */
     char reg_buf[REGEX_BUFLEN];
     char suffix[LIBZE_MAX_PATH_LEN];
@@ -359,7 +372,7 @@ update_boot_unit(libze_handle *lzeh, char be_mountpoint[static 2],
 
     /* Create 'What=' suffix and replacement suffix */
     ret = form_suffix_string(suffix, efi_mountpoint, active_be);
-    ret = (ret != 0) ? ret : form_suffix_string(replace_suffix, efi_mountpoint, be_name);
+    ret = (ret != 0) ? ret : form_suffix_string(replace_suffix, efi_mountpoint, activate_data->be_name);
     if (ret != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                 "Unit EFI path exceeds max path length.\n");
@@ -443,12 +456,12 @@ err:
  * @return Non-zero on failure
  */
 libze_error
-libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, char be_mountpoint[static 2],
-                                      char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
-    char boot_mountpoint[ZFS_MAXPROPLEN];
-    char efi_mountpoint[ZFS_MAXPROPLEN];
+libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, libze_activate_data *activate_data) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char boot_mountpoint[ZFS_MAXPROPLEN];
+    char efi_mountpoint[ZFS_MAXPROPLEN];
 
     char namespace_buf[ZFS_MAXPROPLEN];
     if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf)
@@ -466,22 +479,33 @@ libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, char be_mountpoint[sta
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Couldn't access systemdboot:efi property.\n");
     }
 
-    ret = update_boot_unit(lzeh, be_mountpoint, boot_mountpoint, efi_mountpoint, be_name);
+    ret = update_boot_unit(lzeh, activate_data, boot_mountpoint, efi_mountpoint);
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
     return 0;
 }
 
+/**
+ * @brief Run mid-activate hook
+ * @param lzeh
+ * @return
+ */
 libze_error
-libze_plugin_systemdboot_post_activate(libze_handle *lzeh) {
-    puts("sd_post_activate");
+libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]) {
+    /*
+     * Steps:
+     *   - Modify tempdir/loader/entries/org.zectl-<be>.conf
+     *       - Replace <oldbe> with <newbe>
+     *   - Copy old kernels to esp/env/org.zectl-<be>/
+     *   - Modify loader.conf
+     */
 
     return 0;
 }
 
 libze_error
-libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char be_name[static 1]) {
+libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]) {
     puts("sd_post_destroy");
 
     return 0;

@@ -11,12 +11,17 @@ typedef enum libze_plugin_manager_error {
     LIBZE_PLUGIN_MANAGER_ERROR_PDIR_EEXIST,  /**< Plugin directory @p PLUGINS_DIRECTORY doesn't exist */
 } libze_plugin_manager_error;
 
+typedef struct libze_activate_data {
+    char *be_mountpoint;
+    char *be_name;
+} libze_activate_data;
+
 typedef libze_error (*plugin_fn_init)(libze_handle *lzeh);
 typedef libze_error (*plugin_fn_pre_activate)(libze_handle *lzeh);
-typedef libze_error (*plugin_fn_mid_activate)(libze_handle *lzeh, char be_mountpoint[static 2],
-                                              char be_name[ZFS_MAX_DATASET_NAME_LEN]);
-typedef libze_error (*plugin_fn_post_activate)(libze_handle *lzeh);
-typedef libze_error (*plugin_fn_post_destroy)(libze_handle *lzeh, char be_name[static 1]);
+typedef libze_error (*plugin_fn_mid_activate)(libze_handle *lzeh, libze_activate_data *activate_data);
+typedef libze_error (*plugin_fn_post_activate)(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]);
+typedef libze_error (*plugin_fn_post_destroy)(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]);
+
 typedef struct libze_plugin_fn_export {
     plugin_fn_init plugin_init;
     plugin_fn_pre_activate plugin_pre_activate;

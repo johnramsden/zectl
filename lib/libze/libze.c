@@ -864,9 +864,14 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
         }
     }
 
+    libze_activate_data activate_data = {
+            .be_name = options->be_name,
+            .be_mountpoint = tmp_dirname
+    };
+
     // mid_activate
     if ((lzeh->lz_funcs != NULL) &&
-        (lzeh->lz_funcs->plugin_mid_activate(lzeh, tmp_dirname, options->be_name) != 0)) {
+        (lzeh->lz_funcs->plugin_mid_activate(lzeh, &activate_data) != 0)) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN,
                 "Failed to run mid-activate hook\n");
         goto err;
@@ -949,7 +954,7 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
         goto err;
     }
 
-    if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_activate(lzeh) != 0)) {
+    if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_activate(lzeh, options->be_name) != 0)) {
         goto err;
     }
 
