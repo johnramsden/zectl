@@ -34,8 +34,9 @@ typedef struct libze_plugin_fn_export libze_plugin_fn_export;
  * @invariant if no bootpool: ((boot_pool.lzbph == NULL) && (strlen(boot_pool_root) == 0))
  */
 typedef struct boot_pool {
-    zfs_handle_t *lzbph;                             /**< Handle to current dataset */
-    char boot_pool_root[ZFS_MAX_DATASET_NAME_LEN];   /**< boot pool boot-root name  */
+    zfs_handle_t *lzbph;                              /**< Handle to current boot dataset   */
+    char boot_pool_root[ZFS_MAX_DATASET_NAME_LEN];    /**< Dataset root for boot dataset(s) */
+    char boot_pool_dataset[ZFS_MAX_DATASET_NAME_LEN]; /**< Actual dataset with boot files   */
 } boot_pool;
 
 /**
@@ -54,20 +55,20 @@ typedef struct boot_pool {
  *
  * @invariant Closed with libze_fini:
  * @invariant lzh, lzph are closed and NULL
- * @invariant ze_props has been free'd and is NULL
+ * @invariant ze_props has been freed and is NULL
  */
 struct libze_handle {
-    libzfs_handle_t *lzh;                           /**< Handle to libzfs                   */
-    zpool_handle_t *lzph;                           /**< Handle to current zpool            */
-    char be_root[ZFS_MAX_DATASET_NAME_LEN];         /**< Dataset root of boot environments  */
-    char rootfs[ZFS_MAX_DATASET_NAME_LEN];          /**< Root dataset (current mounted '/') */
-    char bootfs[ZFS_MAX_DATASET_NAME_LEN];          /**< Dataset set to bootfs              */
-    char zpool[ZFS_MAX_DATASET_NAME_LEN];           /**< ZFS pool name                      */
-    boot_pool bootpool;                             /**< boot pool                          */
-    libze_plugin_fn_export *lz_funcs;               /**< Pointer to bootloader plugin       */
-    nvlist_t *ze_props;                             /**< User org.zectl properties          */
-    char libze_error_message[LIBZE_MAX_ERROR_LEN];  /**< Last error buffer                  */
-    libze_error libze_error;                        /**< Last error buffer                  */
+    libzfs_handle_t *lzh;                           /**< Handle to libzfs                         */
+    zpool_handle_t *lzph;                           /**< Handle to current zpool                  */
+    char be_root[ZFS_MAX_DATASET_NAME_LEN];         /**< Dataset root of boot environments        */
+    char rootfs[ZFS_MAX_DATASET_NAME_LEN];          /**< Root dataset (current mounted '/')       */
+    char bootfs[ZFS_MAX_DATASET_NAME_LEN];          /**< Activated boot dataset                   */
+    char zpool[ZFS_MAX_DATASET_NAME_LEN];           /**< ZFS pool name                            */
+    boot_pool bootpool;                             /**< boot pool                                */
+    libze_plugin_fn_export *lz_funcs;               /**< Pointer to bootloader plugin             */
+    nvlist_t *ze_props;                             /**< User org.zectl properties                */
+    char libze_error_message[LIBZE_MAX_ERROR_LEN];  /**< Last error buffer                        */
+    libze_error libze_error;                        /**< Last error buffer                        */
 };
 
 typedef struct libze_clone_cbdata {

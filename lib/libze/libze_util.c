@@ -135,6 +135,21 @@ libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]) {
 }
 
 /**
+ * TODO
+ *
+ */
+boolean_t
+libze_has_own_boot_tree(libze_handle *lzeh) {
+    if (lzeh->bootpool.lzbph == NULL) {
+        return B_FALSE;
+    }
+    if (strcmp(lzeh->bootpool.boot_pool_root, lzeh->bootpool.boot_pool_dataset) == 0) {
+        return B_FALSE;
+    }
+    return B_TRUE;
+}
+
+/**
  * @brief Free an nvlist and one level down of it's children
  * @param[in] nvl nvlist to free
  */

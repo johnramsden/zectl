@@ -1,4 +1,4 @@
-add_compile_definitions(PLUGINS_DIRECTORY=\"${CMAKE_CURRENT_BINARY_DIR}/../libze_plugin\")
+add_definitions(-DPLUGINS_DIRECTORY=\"${CMAKE_CURRENT_BINARY_DIR}/../libze_plugin\")
 
 set(LIBZE_SOURCE_FILES
         libze.c system_linux.c system_linux.h

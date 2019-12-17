@@ -297,7 +297,7 @@ copy_recursive(libze_handle *lzeh, const char *directory_path, const char *new_d
         return LIBZE_ERROR_UNKNOWN;
     }
 
-    /* Check error after for TOCTOU race conditon */
+    /* Check error after for TOCTOU race condition */
     int err = mkdir(new_directory_path, 0700);
     if (err != 0) {
         if (stat(new_directory_path, &st) != 0) {

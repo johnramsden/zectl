@@ -17,8 +17,8 @@ execute_process(COMMAND
 string(STRIP ${ZOL_VERSION} ZOL_VERSION)
 message(STATUS "ZOL_VERSION=${ZOL_VERSION}")
 
-add_compile_definitions(ZOL_VERSION=${ZOL_VERSION})
-add_compile_definitions(DEBUG=1)
+add_definitions(-DZOL_VERSION=${ZOL_VERSION})
+add_definitions(-DDEBUG=1)
 
 add_subdirectory(src)
 add_subdirectory(lib)
