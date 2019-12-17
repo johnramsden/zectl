@@ -14,6 +14,7 @@
 #include "libze/libze_util.h"
 
 #define REGEX_BUFLEN 512
+#define COPY_BUFLEN 4096
 #define SYSTEMDBOOT_ENTRY_PREFIX "org.zectl"
 
 #define NUM_SYSTEMDBOOT_PROPERTY_VALUES 2
@@ -221,18 +222,24 @@ do_copy_file(FILE *file, FILE *new_file)
     assert(file != NULL);
     assert(new_file != NULL);
 
-    while(B_TRUE) {
-        int c = fgetc(file);
-        if(feof(file) != 0) {
-            return LIBZE_ERROR_SUCCESS;
-        }
-        fputc(c, new_file);
+    char buf[COPY_BUFLEN];
 
-        if (ferror (new_file) != 0) {
+    while(B_TRUE) {
+        size_t r = fread(buf, 1, COPY_BUFLEN, file);
+        if(r != COPY_BUFLEN) {
+            if (ferror(file) != 0) {
+                return LIBZE_ERROR_UNKNOWN;
+            }
+            if (r == 0) {
+                fflush(new_file);
+                return LIBZE_ERROR_SUCCESS; /* EOF */
+            }
+        }
+
+        fwrite(buf, 1, r, new_file);
+        if (ferror(new_file) != 0) {
             return LIBZE_ERROR_UNKNOWN;
         }
-
-        fflush(new_file);
     }
 }
 /**
