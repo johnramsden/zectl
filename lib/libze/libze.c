@@ -1,3 +1,8 @@
+// Required for spl stat.h
+#define __USE_LARGEFILE64
+#define _LARGEFILE_SOURCE
+#define _LARGEFILE64_SOURCE
+
 #include "libze/libze.h"
 #include "libze/libze_util.h"
 #include "libze/libze_plugin_manager.h"

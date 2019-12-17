@@ -1,11 +1,6 @@
 #ifndef ZECTL_LIBZE_H
 #define ZECTL_LIBZE_H
 
-// Required for spl stat.h
-#define __USE_LARGEFILE64
-#define _LARGEFILE_SOURCE
-#define _LARGEFILE64_SOURCE
-
 #include <libzfs/libzfs.h>
 
 #define LIBZE_MAX_ERROR_LEN    1024
@@ -40,7 +35,7 @@ typedef struct libze_plugin_fn_export libze_plugin_fn_export;
  */
 typedef struct boot_pool {
     zfs_handle_t *lzbph;                             /**< Handle to current dataset */
-    char boot_pool_root[ZFS_MAX_DATASET_NAME_LEN];   /**< boot pool boot-root name      */
+    char boot_pool_root[ZFS_MAX_DATASET_NAME_LEN];   /**< boot pool boot-root name  */
 } boot_pool;
 
 /**

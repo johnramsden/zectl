@@ -1,12 +1,20 @@
+// Required for spl stat.h
+#define __USE_LARGEFILE64
+#define _LARGEFILE_SOURCE
+#define _LARGEFILE64_SOURCE
+
 #include <stdio.h>
 #include <string.h>
 #include <regex.h>
 #include <stdlib.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include "libze_plugin/libze_plugin_systemdboot.h"
 #include "libze/libze_util.h"
 
 #define REGEX_BUFLEN 512
+#define SYSTEMDBOOT_ENTRY_PREFIX "org.zectl"
 
 #define NUM_SYSTEMDBOOT_PROPERTY_VALUES 2
 #define NUM_SYSTEMDBOOT_PROPERTIES 2
@@ -165,6 +173,41 @@ form_unit_regex(char reg_buf[REGEX_BUFLEN],
     return LIBZE_ERROR_SUCCESS;
 }
 
+static libze_error
+form_loader_path(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
+                const char middle_dir[LIBZE_MAX_PATH_LEN],
+                const char be_name[LIBZE_MAX_PATH_LEN],
+                char loader_buf[LIBZE_MAX_PATH_LEN]) {
+
+    int ret = snprintf(loader_buf, LIBZE_MAX_PATH_LEN,
+                       "%s/%s/%s-%s",
+                        efi_mountpoint, middle_dir,
+                        SYSTEMDBOOT_ENTRY_PREFIX, be_name);
+
+    if (ret >= REGEX_BUFLEN) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+static libze_error
+form_loader_config(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
+                   const char be_name[LIBZE_MAX_PATH_LEN],
+                   char loader_buf[LIBZE_MAX_PATH_LEN]) {
+
+    libze_error ret = form_loader_path(efi_mountpoint, "loader/entries", be_name, loader_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    if (strlcat(loader_buf, ".conf", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
 /**
  * @brief Copy binary file into new binary file
  * @param lzeh
@@ -173,7 +216,7 @@ form_unit_regex(char reg_buf[REGEX_BUFLEN],
  * @return
  */
 static libze_error
-do_copy_file(libze_handle *lzeh, FILE *file, FILE *new_file)
+do_copy_file(FILE *file, FILE *new_file)
 {
     assert(file != NULL);
     assert(new_file != NULL);
@@ -218,7 +261,7 @@ copy_file(libze_handle *lzeh, const char *filename, const char *new_filename)
         goto err;
     }
 
-    ret = do_copy_file(lzeh, file, new_file);
+    ret = do_copy_file(file, new_file);
 
 err:
     fclose(file);
@@ -227,6 +270,95 @@ err:
     }
 
     return ret;
+}
+
+static libze_error
+copy_recursive(libze_handle *lzeh, const char *directory_path, const char *new_directory_path) {
+    DIR *directory = NULL;
+    DIR *new_directory = NULL;
+    char path[LIBZE_MAX_PATH_LEN];
+    char new_path[LIBZE_MAX_PATH_LEN];
+    char *fin = path;
+    char *new_fin = new_path;
+    struct dirent *de;
+    struct stat st;
+
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    directory = opendir(directory_path);
+    if (directory == NULL) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
+    /* Check error after for TOCTOU race conditon */
+    int err = mkdir(new_directory_path, 0700);
+    if (err != 0) {
+        if (stat(new_directory_path, &st) != 0) {
+            return LIBZE_ERROR_UNKNOWN;
+        }
+
+        if(!S_ISDIR(st.st_mode)) {
+            return LIBZE_ERROR_UNKNOWN;
+        }
+    }
+
+    new_directory = opendir(new_directory_path);
+    if (new_directory == NULL) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
+    /* Copy current path into path */
+    if (strlcpy(path, directory_path, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+    if (strlcpy(new_path, new_directory_path, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+
+    /* Move the fin to end of string */
+    fin += strlen(directory_path);
+    new_fin += strlen(new_directory_path);
+
+    while((de = readdir(directory)) != NULL) {
+
+        char buf[LIBZE_MAX_PATH_LEN];
+
+        /* Copy filename into path */
+        if ((strlcpy(buf, "/", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+            (strlcat(buf, de->d_name, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+            return LIBZE_ERROR_MAXPATHLEN;
+        }
+
+        if ((strlcpy(fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+            (strlcpy(new_fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+            return LIBZE_ERROR_MAXPATHLEN;
+        }
+
+        if (stat(path, &st) != 0) {
+            return LIBZE_ERROR_UNKNOWN;
+        }
+
+        if(S_ISDIR(st.st_mode)) {
+            if ((strcmp(fin, "/.") == 0) || (strcmp(fin, "/..") == 0)) {
+                /* Skip entering "." or ".." */
+                continue;
+            }
+
+            /* path is directory, recurse */
+            if ((ret = copy_recursive(lzeh, path, new_directory_path)) != LIBZE_ERROR_SUCCESS) {
+                return ret;
+            }
+        }
+
+        if(S_ISREG(st.st_mode)) {
+            /* path is file, copy */
+            if ((ret = copy_file(lzeh, path, new_path) != LIBZE_ERROR_SUCCESS)) {
+                return ret;
+            }
+        }
+
+        /* Otherwise do nothing */
+    }
 }
 
 static libze_error
@@ -257,8 +389,6 @@ copy_matched(libze_handle *lzeh,
             regex_t *regexp,
             int tmpfd) {
 
-    int err = 0;
-
     FILE *tmp = fdopen(tmpfd, "w");
     if (tmp == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
@@ -276,18 +406,18 @@ copy_matched(libze_handle *lzeh,
     char line_buf[LIBZE_MAX_PATH_LEN];
 
     while (fgets(line_buf, LIBZE_MAX_PATH_LEN, file)) {
-        err = regexec(regexp, line_buf, 0, NULL, 0);
 
-        if (err == 0) {
+        if (regexec(regexp, line_buf, 0, NULL, 0) == 0) {
+            /* Regex matched */
             matched = B_TRUE;
             fwrite(replace_line, 1, strlen(replace_line), tmp);
-            fflush(tmp);
             continue;
         }
 
         fwrite(line_buf, 1, strlen(line_buf), tmp);
-        fflush(tmp);
     }
+
+    fflush(tmp);
 
     fclose(file);
     fclose(tmp);
@@ -393,7 +523,7 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     interr = libze_util_concat(SYSTEMD_SYSTEM_UNIT_PATH, "/",
             "/.zectl-sdboot.XXXXXX", LIBZE_MAX_PATH_LEN, tmpfile_front);
 
-    if (interr != 0) {
+    if (interr == 0) {
         interr = libze_util_concat(activate_data->be_mountpoint, "/",
             tmpfile_front, LIBZE_MAX_PATH_LEN, tmpfile);
     }
@@ -486,20 +616,78 @@ libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, libze_activate_data *a
 
 /**
  * @brief Run mid-activate hook
- * @param lzeh
- * @return
+ * @param lzeh Initialized libze handle
+ * @return Non @p LIBZE_ERROR_SUCCESS on failure
  */
 libze_error
 libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]) {
     /*
      * Steps:
-     *   - Modify tempdir/loader/entries/org.zectl-<be>.conf
+     *   - Copy <esp>/loader/entries/<prefix>-<oldbe>.conf -> <prefix>-<be>.conf
+     *   - Modify esp/loader/entries/org.zectl-<be>.conf
      *       - Replace <oldbe> with <newbe>
      *   - Copy old kernels to esp/env/org.zectl-<be>/
      *   - Modify loader.conf
      */
 
-    return 0;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char active_be[ZFS_MAX_DATASET_NAME_LEN];
+    if (libze_boot_env_name(lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Bootfs exceeds max path length.\n");
+    }
+
+    char boot_mountpoint[ZFS_MAXPROPLEN];
+    char efi_mountpoint[ZFS_MAXPROPLEN];
+
+    char namespace_buf[ZFS_MAXPROPLEN];
+    if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf) != LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Exceeded max property name length.\n");
+    }
+
+    ret = libze_be_prop_get(lzeh, boot_mountpoint, "boot", namespace_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Couldn't access systemdboot:boot property.\n");
+    }
+    ret = libze_be_prop_get(lzeh, efi_mountpoint, "efi", namespace_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Couldn't access systemdboot:efi property.\n");
+    }
+
+    /* Copy <esp>/loader/entries/<prefix>-<oldbe>.conf -> <prefix>-<be>.conf */
+    char loader_buf[LIBZE_MAX_PATH_LEN];
+    char new_loader_buf[LIBZE_MAX_PATH_LEN];
+
+    ret = form_loader_config(efi_mountpoint, active_be, loader_buf);
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        ret = form_loader_config(efi_mountpoint, be_name, new_loader_buf);
+    }
+
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "BE loader path exceeds max path length.\n");
+    }
+
+    char loader_dir_buf[LIBZE_MAX_PATH_LEN];
+    char new_loader_dir_buf[LIBZE_MAX_PATH_LEN];
+    ret = form_loader_path(efi_mountpoint, "env", active_be, loader_dir_buf);
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        ret = form_loader_path(efi_mountpoint, "env", be_name, new_loader_dir_buf);
+    }
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    ret = copy_recursive(lzeh, loader_dir_buf, new_loader_dir_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    return ret;
 }
 
 libze_error
