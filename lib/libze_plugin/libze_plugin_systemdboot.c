@@ -472,6 +472,7 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
      */
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
+    int iret = 0;
 
     char active_be[ZFS_MAX_DATASET_NAME_LEN];
     if (libze_boot_env_name(lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
@@ -513,19 +514,36 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
                 "BE loader path exceeds max path length.\n");
     }
 
-    char loader_dir_buf[LIBZE_MAX_PATH_LEN];
-    char new_loader_dir_buf[LIBZE_MAX_PATH_LEN];
-    ret = form_loader_path(efi_mountpoint, "env", active_be, loader_dir_buf);
+    char loader_buf[LIBZE_MAX_PATH_LEN];
+    char new_loader_buf[LIBZE_MAX_PATH_LEN];
+    ret = form_loader_path(efi_mountpoint, "env", active_be, loader_buf);
     if (ret == LIBZE_ERROR_SUCCESS) {
-        ret = form_loader_path(efi_mountpoint, "env", be_name, new_loader_dir_buf);
+        ret = form_loader_path(efi_mountpoint, "env", be_name, new_loader_buf);
     }
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
 
-    ret = libze_util_copydir(loader_dir_buf, new_loader_dir_buf);
+    iret = libze_util_copydir(loader_buf, new_loader_buf);
+    if (iret != 0) {
+        // TODO: Check error, return better message
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to copy %s -> %s.\n", loader_buf, new_loader_buf);
+    }
+
+    ret = form_loader_config(efi_mountpoint, active_be, loader_buf);
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        ret = form_loader_config(efi_mountpoint, be_name, new_loader_buf);
+    }
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
+    }
+
+    iret = libze_util_copy_file(loader_buf, new_loader_buf);
+    if (iret != 0) {
+        // TODO: Check error, return better message
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to copy %s -> %s.\n", loader_buf, new_loader_buf);
     }
 
     return ret;
