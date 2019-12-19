@@ -1,20 +1,12 @@
-// Required for spl stat.h
-#define __USE_LARGEFILE64
-#define _LARGEFILE_SOURCE
-#define _LARGEFILE64_SOURCE
-
 #include <stdio.h>
 #include <string.h>
 #include <regex.h>
 #include <stdlib.h>
-#include <dirent.h>
-#include <sys/stat.h>
 
 #include "libze_plugin/libze_plugin_systemdboot.h"
 #include "libze/libze_util.h"
 
 #define REGEX_BUFLEN 512
-#define COPY_BUFLEN 4096
 #define SYSTEMDBOOT_ENTRY_PREFIX "org.zectl"
 
 #define NUM_SYSTEMDBOOT_PROPERTY_VALUES 2
@@ -197,7 +189,8 @@ form_loader_config(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
                    const char be_name[LIBZE_MAX_PATH_LEN],
                    char loader_buf[LIBZE_MAX_PATH_LEN]) {
 
-    libze_error ret = form_loader_path(efi_mountpoint, "loader/entries", be_name, loader_buf);
+    libze_error ret = form_loader_path(efi_mountpoint,
+            "loader/entries", be_name, loader_buf);
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
@@ -207,165 +200,6 @@ form_loader_config(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
     }
 
     return LIBZE_ERROR_SUCCESS;
-}
-
-/**
- * @brief Copy binary file into new binary file
- * @param lzeh
- * @param file Original file (rb)
- * @param new_file New file (wb)
- * @return
- */
-static libze_error
-do_copy_file(FILE *file, FILE *new_file)
-{
-    assert(file != NULL);
-    assert(new_file != NULL);
-
-    char buf[COPY_BUFLEN];
-
-    while(B_TRUE) {
-        size_t r = fread(buf, 1, COPY_BUFLEN, file);
-        if(r != COPY_BUFLEN) {
-            if (ferror(file) != 0) {
-                return LIBZE_ERROR_UNKNOWN;
-            }
-            if (r == 0) {
-                fflush(new_file);
-                return LIBZE_ERROR_SUCCESS; /* EOF */
-            }
-        }
-
-        fwrite(buf, 1, r, new_file);
-        if (ferror(new_file) != 0) {
-            return LIBZE_ERROR_UNKNOWN;
-        }
-    }
-}
-/**
- * @brief Copy binary file into new file
- * @param lzeh
- * @param file Original filename
- * @param new_file New filename
- * @return @p LIBZE_ERROR_SUCCESS on success
- */
-static libze_error
-copy_file(libze_handle *lzeh, const char *filename, const char *new_filename)
-{
-    FILE *file = NULL;
-    FILE *new_file = NULL;
-
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    file = fopen(filename, "rb");
-    if (file == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to open %s", filename);
-    }
-
-    new_file = fopen(new_filename, "w+b");
-    if (new_file == NULL) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to open %s", new_filename);
-        goto err;
-    }
-
-    ret = do_copy_file(file, new_file);
-
-err:
-    fclose(file);
-    if (new_file != NULL) {
-        fclose(new_file);
-    }
-
-    return ret;
-}
-
-static libze_error
-copy_recursive(libze_handle *lzeh, const char *directory_path, const char *new_directory_path) {
-    DIR *directory = NULL;
-    DIR *new_directory = NULL;
-    char path[LIBZE_MAX_PATH_LEN];
-    char new_path[LIBZE_MAX_PATH_LEN];
-    char *fin = path;
-    char *new_fin = new_path;
-    struct dirent *de;
-    struct stat st;
-
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    directory = opendir(directory_path);
-    if (directory == NULL) {
-        return LIBZE_ERROR_UNKNOWN;
-    }
-
-    /* Check error after for TOCTOU race conditon */
-    int err = mkdir(new_directory_path, 0700);
-    if (err != 0) {
-        if (stat(new_directory_path, &st) != 0) {
-            return LIBZE_ERROR_UNKNOWN;
-        }
-
-        if(!S_ISDIR(st.st_mode)) {
-            return LIBZE_ERROR_UNKNOWN;
-        }
-    }
-
-    new_directory = opendir(new_directory_path);
-    if (new_directory == NULL) {
-        return LIBZE_ERROR_UNKNOWN;
-    }
-
-    /* Copy current path into path */
-    if (strlcpy(path, directory_path, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
-        return LIBZE_ERROR_MAXPATHLEN;
-    }
-    if (strlcpy(new_path, new_directory_path, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
-        return LIBZE_ERROR_MAXPATHLEN;
-    }
-
-    /* Move the fin to end of string */
-    fin += strlen(directory_path);
-    new_fin += strlen(new_directory_path);
-
-    while((de = readdir(directory)) != NULL) {
-
-        char buf[LIBZE_MAX_PATH_LEN];
-
-        /* Copy filename into path */
-        if ((strlcpy(buf, "/", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-            (strlcat(buf, de->d_name, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
-            return LIBZE_ERROR_MAXPATHLEN;
-        }
-
-        if ((strlcpy(fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-            (strlcpy(new_fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
-            return LIBZE_ERROR_MAXPATHLEN;
-        }
-
-        if (stat(path, &st) != 0) {
-            return LIBZE_ERROR_UNKNOWN;
-        }
-
-        if(S_ISDIR(st.st_mode)) {
-            if ((strcmp(fin, "/.") == 0) || (strcmp(fin, "/..") == 0)) {
-                /* Skip entering "." or ".." */
-                continue;
-            }
-
-            /* path is directory, recurse */
-            if ((ret = copy_recursive(lzeh, path, new_directory_path)) != LIBZE_ERROR_SUCCESS) {
-                return ret;
-            }
-        }
-
-        if(S_ISREG(st.st_mode)) {
-            /* path is file, copy */
-            if ((ret = copy_file(lzeh, path, new_path) != LIBZE_ERROR_SUCCESS)) {
-                return ret;
-            }
-        }
-
-        /* Otherwise do nothing */
-    }
 }
 
 static libze_error
@@ -485,7 +319,7 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     }
 
     /* backup unit */
-    if ((ret = copy_file(lzeh, unit_buf, new_filename)) != LIBZE_ERROR_SUCCESS) {
+    if ((ret = libze_util_copy_file(unit_buf, new_filename)) != 0) {
         return ret;
     }
 
@@ -689,7 +523,7 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
         return ret;
     }
 
-    ret = copy_recursive(lzeh, loader_dir_buf, new_loader_dir_buf);
+    ret = libze_util_copydir(loader_dir_buf, new_loader_dir_buf);
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
     }

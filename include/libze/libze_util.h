@@ -1,13 +1,12 @@
-//
-// Created by john on 12/25/18.
-//
-
 #ifndef ZECTL_LIBZE_UTIL_H
 #define ZECTL_LIBZE_UTIL_H
 
 #include <stdio.h>
 #include <string.h>
 #include <stdio.h>
+#include <libze/libze.h>
+
+#define COPY_BUFLEN 4096
 
 #if defined(DEBUG) && DEBUG > 0
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -43,5 +42,12 @@ libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN], const c
 
 void
 libze_list_free(nvlist_t *nvl);
+
+int
+libze_util_copy_file(const char *filename, const char *new_filename);
+
+int
+libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
+                          const char new_directory_path[LIBZE_MAX_PATH_LEN]);
 
 #endif //ZECTL_LIBZE_UTIL_H

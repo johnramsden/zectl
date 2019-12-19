@@ -1,8 +1,17 @@
+// Required for spl stat.h
+#define __USE_LARGEFILE64
+#define _LARGEFILE_SOURCE
+#define _LARGEFILE64_SOURCE
+
 #include <string.h>
 #include <sys/mount.h>
+#include <libze/libze_util.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include "libze/libze.h"
 #include "system_linux.h"
+
 /**
  * @brief Concatenate two strings with a separator
  * @param[in] prefix Prefix string
@@ -197,4 +206,175 @@ libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN], const c
     }
 
     return LIBZE_ERROR_SUCCESS;
+}
+
+/**
+ * @brief Copy binary file into new binary file
+ * @param file Original file (rb)
+ * @param new_file New file (wb)
+ * @return 0 on success else appropriate error as returned by errno
+ */
+static int
+libze_util_copy_filepointer(FILE *file, FILE *new_file)
+{
+    assert(file != NULL);
+    assert(new_file != NULL);
+
+    errno = 0;
+    char buf[COPY_BUFLEN];
+
+    while(B_TRUE) {
+        size_t r = fread(buf, 1, COPY_BUFLEN, file);
+        if(r != COPY_BUFLEN) {
+            if (ferror(file) != 0) {
+                return errno;
+            }
+            if (r == 0) {
+                fflush(new_file);
+                return 0; /* EOF */
+            }
+        }
+
+        fwrite(buf, 1, r, new_file);
+        if (ferror(new_file) != 0) {
+            return errno;
+        }
+    }
+}
+/**
+ * @brief Copy binary file into new file
+ * @param file Original filename
+ * @param new_file New filename
+ * @return 0 on success else appropriate error as returned by errno
+ */
+int
+libze_util_copy_file(const char *filename, const char *new_filename)
+{
+    FILE *file = NULL;
+    FILE *new_file = NULL;
+
+    libze_error ret = 0;
+    errno = 0;
+
+    file = fopen(filename, "rb");
+    if (file == NULL) {
+        return errno;
+    }
+
+    new_file = fopen(new_filename, "w+b");
+    if (new_file == NULL) {
+        ret = errno;
+        goto err;
+    }
+
+    ret = libze_util_copy_filepointer(file, new_file);
+
+err:
+    fclose(file);
+    if (new_file != NULL) {
+        fclose(new_file);
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Copy a directory recursively
+ * @param directory_path Directory to copy
+ * @param new_directory_path Destination to copy to
+ * @return 0 on success else appropriate error as returned by errno
+ */
+int
+libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
+                   const char new_directory_path[LIBZE_MAX_PATH_LEN]) {
+    DIR *directory = NULL;
+    DIR *new_directory = NULL;
+    char path[LIBZE_MAX_PATH_LEN];
+    char new_path[LIBZE_MAX_PATH_LEN];
+    char *fin = path;
+    char *new_fin = new_path;
+    struct dirent *de;
+    struct stat st;
+
+    int ret = 0;
+    errno = 0;
+
+    directory = opendir(directory_path);
+    if (directory == NULL) {
+        return errno;
+    }
+
+    /* Check error after for TOCTOU race conditon */
+    int err = mkdir(new_directory_path, 0700);
+    if (err != 0) {
+        errno = 0;
+        if (stat(new_directory_path, &st) != 0) {
+            return errno;
+        }
+
+        if(!S_ISDIR(st.st_mode)) {
+            return ENOTDIR;
+        }
+    }
+
+    errno = 0;
+    new_directory = opendir(new_directory_path);
+    if (new_directory == NULL) {
+        return errno;
+    }
+
+    /* Copy current path into path */
+    if (strlcpy(path, directory_path, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        return ENAMETOOLONG;
+    }
+    if (strlcpy(new_path, new_directory_path, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        return ENAMETOOLONG;
+    }
+
+    /* Move the fin to end of string */
+    fin += strlen(directory_path);
+    new_fin += strlen(new_directory_path);
+
+    while((de = readdir(directory)) != NULL) {
+
+        char buf[LIBZE_MAX_PATH_LEN];
+
+        /* Copy filename into path */
+        if ((strlcpy(buf, "/", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+            (strlcat(buf, de->d_name, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+            return ENAMETOOLONG;
+        }
+
+        if ((strlcpy(fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+            (strlcpy(new_fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+            return ENAMETOOLONG;
+        }
+
+        if (stat(path, &st) != 0) {
+            return errno;
+        }
+
+        if(S_ISDIR(st.st_mode)) {
+            if ((strcmp(fin, "/.") == 0) || (strcmp(fin, "/..") == 0)) {
+                /* Skip entering "." or ".." */
+                continue;
+            }
+
+            /* path is directory, recurse */
+            if ((ret = libze_util_copydir(path, new_directory_path)) != 0) {
+                return ret;
+            }
+        }
+
+        if(S_ISREG(st.st_mode)) {
+            /* path is file, copy */
+            if ((ret = libze_util_copy_file(path, new_path) != 0)) {
+                return ret;
+            }
+        }
+
+        /* Otherwise do nothing */
+    }
+
+    return 0;
 }
