@@ -30,6 +30,9 @@ libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char 
 int
 libze_util_suffix_after_string(const char root[static 1], const char dataset[static 1], size_t buflen, char buf[buflen]);
 
+boolean_t
+libze_get_zpool_name_from_dataset(const char dataset[static 3], size_t buflen, char buf[buflen]);
+
 int
 libze_get_root_dataset(libze_handle *lzeh);
 
@@ -37,9 +40,6 @@ boolean_t
 libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]);
 boolean_t
 libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]);
-boolean_t
-libze_has_own_boot_tree(libze_handle *lzeh);
-
 libze_error
 libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN], const char mountpoint[static 2]);
 

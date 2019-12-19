@@ -1,13 +1,23 @@
 {
     "cSpell.words": [
+        "NOLINT",
         "PDIR",
         "TOCTOU",
+        "Wuninitialized",
+        "ZPROP",
+        "free'd",
+        "hicpp",
         "lzbph",
         "lzeh",
         "lzph",
         "newbe",
         "nvpair",
         "oldbe",
-        "tmpfd"
+        "pcbd",
+        "slashp",
+        "tmpfd",
+        "zhandle",
+        "zhdl",
+        "zroot"
     ],
 }

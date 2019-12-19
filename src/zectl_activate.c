@@ -35,7 +35,7 @@ ze_activate(libze_handle *lzeh, int argc, char **argv) {
     options.be_name = argv[0];
 
     char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if (libze_util_concat(lzeh->be_root, "/",
+    if (libze_util_concat(lzeh->env_root, "/",
             options.be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != 0) {
         fprintf(stderr, "Requested boot environment %s exceeds max length %d\n",
                 options.be_name, ZFS_MAX_DATASET_NAME_LEN);

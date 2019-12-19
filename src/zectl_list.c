@@ -22,6 +22,13 @@ typedef struct list_options {
     boolean_t tab_delimited;
 } list_options_t;
 
+/**
+ * @brief TODO
+ * @param be_props
+ * @param options
+ * @param widths
+ * @return
+ */
 static int
 compute_column_widths(nvlist_t *be_props, list_options_t *options, list_value_widths_t *widths) {
     int active_width = 0;
@@ -56,8 +63,14 @@ compute_column_widths(nvlist_t *be_props, list_options_t *options, list_value_wi
     return 0;
 }
 
+/**
+ * @brief TODO
+ * @param lzeh Initialized libze handle
+ * @param bootenvs
+ * @param options
+ */
 static void
-print_bes(nvlist_t **bootenvs, list_options_t *options) {
+print_bes(libze_handle *lzeh, nvlist_t **bootenvs, list_options_t *options) {
     nvpair_t *pair;
     nvlist_t *be_props;
     char *string_prop;
@@ -95,7 +108,8 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
 
         if (nvlist_lookup_string(be_props, "name", &string_prop) == 0) {
             char buf[ZFS_MAX_DATASET_NAME_LEN];
-            libze_boot_env_name(string_prop, ZFS_MAX_DATASET_NAME_LEN, buf);
+            // TODO Evaluate: Return value not tested
+            libze_boot_env_name(lzeh, string_prop, ZFS_MAX_DATASET_NAME_LEN, buf);
             printf("%-*s%s", (int)widths.name, buf, tab_suffix);
         }
 
@@ -126,6 +140,13 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
     }
 }
 
+/**
+ * @brief TODO
+ * @param lzeh Initialized libze handle
+ * @param argc The number of given arguments
+ * @param argv The given arguments in a list
+ * @return
+ */
 libze_error
 ze_list(libze_handle *lzeh, int argc, char **argv) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
@@ -158,7 +179,7 @@ ze_list(libze_handle *lzeh, int argc, char **argv) {
     }
 
     if ((ret = libze_list(lzeh, &outnvl)) == LIBZE_ERROR_SUCCESS) {
-        print_bes(&outnvl, &options);
+        print_bes(lzeh, &outnvl, &options);
     }
 
     libze_list_free(outnvl);

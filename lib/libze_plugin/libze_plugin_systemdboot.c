@@ -458,12 +458,6 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     libze_error ret = LIBZE_ERROR_SUCCESS;
     int interr = 0;
 
-    char active_be[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_boot_env_name(lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Bootfs exceeds max path length.\n");
-    }
-
     /* Get path to boot.mount */
     char unit_buf[LIBZE_MAX_PATH_LEN];
     ret = form_boot_mountpoint_unit(lzeh, boot_mountpoint, activate_data->be_mountpoint, unit_buf);
@@ -477,11 +471,10 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
 
     char new_filename[LIBZE_MAX_PATH_LEN];
 
-    int err = libze_util_concat(unit_buf, ".",
-            "bak", LIBZE_MAX_PATH_LEN, new_filename);
+    int err = libze_util_concat(unit_buf, ".", "bak", LIBZE_MAX_PATH_LEN, new_filename);
     if (err != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Backup boot mount unit exceeds max path length.\n");
+                "Backup boot mount unit exceeds max path length (%d).\n", LIBZE_MAX_PATH_LEN);
     }
 
     /* backup unit */
@@ -496,14 +489,14 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
 
     /* Create 'What=' suffix and replacement suffix */
     interr = libze_util_concat(efi_mountpoint, "/env/",
-            active_be, LIBZE_MAX_PATH_LEN, suffix);
+            lzeh->env_activated, LIBZE_MAX_PATH_LEN, suffix);
     if (interr != 0) {
         interr = libze_util_concat(efi_mountpoint, "/env/",
                 activate_data->be_name, LIBZE_MAX_PATH_LEN, replace_suffix);
     }
     if (interr != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Unit EFI path exceeds max path length.\n");
+                "Unit EFI path exceeds max path length (%d).\n", LIBZE_MAX_PATH_LEN);
         goto err;
     }
 
@@ -511,16 +504,16 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     ret = form_unit_regex(reg_buf, "What", suffix);
     if (ret != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Regex exceeds max path length.\n");
+                "Regex exceeds max path length (%d).\n", LIBZE_MAX_PATH_LEN);
         goto err;
     }
     regex_t regexp;
     interr = regcomp(&regexp, reg_buf, 0);
     if (interr != 0) {
         char buf[LIBZE_MAX_ERROR_LEN];
-        (void)regerror(interr, &regexp, buf, LIBZE_MAX_ERROR_LEN);
+        (void) regerror(interr, &regexp, buf, LIBZE_MAX_ERROR_LEN);
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Regex %s failed to compile:\n%s\n", reg_buf, buf);
+                "Regex (%s) failed to compile:\n%s\n", reg_buf, buf);
         goto err;
     }
 
@@ -542,19 +535,17 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     }
 
     /* Create the replacement line */
-    char replace_line[LIBZE_MAX_PATH_LEN];
-    interr = libze_util_concat("What=", replace_suffix,
-            "\n", LIBZE_MAX_PATH_LEN, replace_line);
+    char replace_line[LIBZE_MAX_PATH_LEN] = "";
+    interr = libze_util_concat("What=", replace_suffix, "\n", LIBZE_MAX_PATH_LEN, replace_line);
     if (interr != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Unit EFI path exceeds max path length.\n");
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Unit EFI path exceeds max path length  (%d).\n", LIBZE_MAX_PATH_LEN);
         goto err;
     }
 
     int fd = mkstemp(tmpfile);
     if (fd == -1) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed to create temporary file\n");
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to create temporary file (%s).\n",
+                tmpfile);
         goto err;
     }
 
@@ -572,9 +563,7 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     if (interr != 0) {
         // TODO: Better error message from errno
         remove(tmpfile);
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed to replace boot mount unit %s.\n",
-                unit_buf);
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to replace boot mount unit %s.\n", unit_buf);
         goto err;
     }
 
@@ -601,7 +590,7 @@ libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, libze_activate_data *a
     char namespace_buf[ZFS_MAXPROPLEN];
     if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf) != LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Exceeded max property name length.\n");
+                "Exceeded max property name length (%d).\n", ZFS_MAXPROPLEN);
     }
 
     ret = libze_be_prop_get(lzeh, boot_mountpoint, "boot", namespace_buf);
@@ -640,9 +629,8 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
     char active_be[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_boot_env_name(lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Bootfs exceeds max path length.\n");
+    if ((ret = libze_boot_env_name(lzeh, lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be)) != LIBZE_ERROR_SUCCESS) {
+        return ret;
     }
 
     char boot_mountpoint[ZFS_MAXPROPLEN];
@@ -651,7 +639,7 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
     char namespace_buf[ZFS_MAXPROPLEN];
     if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf) != LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Exceeded max property name length.\n");
+                "Exceeded max property name length (%d).\n", ZFS_MAXPROPLEN);
     }
 
     ret = libze_be_prop_get(lzeh, boot_mountpoint, "boot", namespace_buf);
@@ -676,7 +664,7 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
 
     if (ret != LIBZE_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "BE loader path exceeds max path length.\n");
+                "BE loader path exceeds max path length (%d).\n", LIBZE_MAX_PATH_LEN);
     }
 
     char loader_dir_buf[LIBZE_MAX_PATH_LEN];
