@@ -38,7 +38,7 @@ typedef struct libze_plugin_fn_export libze_plugin_fn_export;
  * @invariant If bootpool exists: pool_zhdl != NULL && all strings not empty (strlen >= 1)
  *            Else:               pool_zhdl == NULL and all strings empty (strlen == 0)
  */
-typedef struct bootpool_t {
+typedef struct bootpool {
     zpool_handle_t *pool_zhdl; /**< A handle to the boot zpool                                           */
     char zpool_name[ZFS_MAX_DATASET_NAME_LEN]; /**< ZFS Pool name for all boot datasets of all boot environments     */
     char root_path[ZFS_MAX_DATASET_NAME_LEN];  /**< Dataset root path (e.g. "bpool/boot/env")      */
