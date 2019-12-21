@@ -1,0 +1,20 @@
+BasedOnStyle: llvm
+IndentWidth: 4
+AllowShortFunctionsOnASingleLine: None
+
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+
+AllowShortFunctionsOnASingleLine: None
+
+BreakBeforeBraces: Custom
+BreakConstructorInitializers: AfterColon
+BraceWrapping:
+    BeforeElse: true
+    BeforeCatch: true
+
+ColumnLimit: 120
+
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+
+IndentCaseLabels: true

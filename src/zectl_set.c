@@ -1,20 +1,21 @@
 #include "zectl.h"
 
 /**
- * set command main function
+ * Set command main function
  * @param lzeh Initialized handle to libze object
  * @param argc As passed to main
- * @param argv As passed to main, contains boot env to create
- * @return LIBZE_ERROR_SUCCESS upon success
+ * @param argv As passed to main, contains TODO
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_NONMEM TODO,
+ *         @p LIBZE_ERROR_UNKNOWN TODO
  */
-libze_error
-ze_set(libze_handle *lzeh, int argc, char **argv) {
+libze_error ze_set(libze_handle *lzeh, int argc, char **argv) {
 
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-    nvlist_t *properties = NULL;
+    libze_error ret        = LIBZE_ERROR_SUCCESS;
+    nvlist_t *  properties = NULL;
 
     if (argc == 0) {
-        fprintf(stderr, "No properties provided\n");
+        fprintf(stderr, "No properties provided.\n");
         ze_usage();
         return LIBZE_ERROR_UNKNOWN;
     }
@@ -37,7 +38,7 @@ ze_set(libze_handle *lzeh, int argc, char **argv) {
     }
 
     ret = libze_set(lzeh, properties);
-    
+
 err:
     fnvlist_free(properties);
     return ret;

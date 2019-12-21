@@ -1,9 +1,16 @@
 #include "zectl.h"
 
-libze_error
-ze_snapshot(libze_handle *lzeh, int argc, char **argv) {
+/**
+ * @brief Snapshot command main function
+ * @param lzeh Initialized handle to libze object
+ * @param argc As passed to main
+ * @param argv As passed to main, contains boot env to snapshot
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p TODO comment error
+ */
+libze_error ze_snapshot(libze_handle *lzeh, int argc, char **argv) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
-    int opt;
+    int         opt;
 
     opterr = 0;
 
@@ -21,7 +28,7 @@ ze_snapshot(libze_handle *lzeh, int argc, char **argv) {
     argv += optind;
 
     if (argc != 1) {
-        fprintf(stderr, "%s snapshot: wrong number of arguments\n", ZE_PROGRAM);
+        fprintf(stderr, "%s snapshot: wrong number of arguments.\n", ZE_PROGRAM);
         ze_usage();
         return LIBZE_ERROR_UNKNOWN;
     }

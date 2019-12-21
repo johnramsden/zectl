@@ -1,7 +1,14 @@
 #include "zectl.h"
 
-libze_error
-ze_unmount(libze_handle *lzeh, int argc, char **argv) {
+/**
+ * @brief Unmount command main function
+ * @param lzeh Initialized handle to libze object
+ * @param argc As passed to main
+ * @param argv As passed to main, contains boot env to unmount
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p TODO comment error
+ */
+libze_error ze_unmount(libze_handle *lzeh, int argc, char **argv) {
     int opt;
     opterr = 0;
 
@@ -18,7 +25,7 @@ ze_unmount(libze_handle *lzeh, int argc, char **argv) {
     argv += optind;
 
     if (argc != 1) {
-        fprintf(stderr, "%s unmount: wrong number of arguments\n", ZE_PROGRAM);
+        fprintf(stderr, "%s unmount: wrong number of arguments.\n", ZE_PROGRAM);
         ze_usage();
         return LIBZE_ERROR_UNKNOWN;
     }

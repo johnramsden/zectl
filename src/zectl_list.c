@@ -1,11 +1,11 @@
 #include "zectl.h"
 #include "zectl_util.h"
 
-#define HEADER_NAME       "Name"
-#define HEADER_ACTIVE     "Active"
+#define HEADER_NAME "Name"
+#define HEADER_ACTIVE "Active"
 #define HEADER_MOUNTPOINT "Mountpoint"
-#define HEADER_SPACEUSED  "Space"
-#define HEADER_CREATION   "Creation"
+#define HEADER_SPACEUSED "Space"
+#define HEADER_CREATION "Creation"
 
 typedef struct list_value_widths {
     size_t name;
@@ -29,8 +29,7 @@ typedef struct list_options {
  * @param widths
  * @return
  */
-static int
-compute_column_widths(nvlist_t *be_props, list_options_t *options, list_value_widths_t *widths) {
+static int compute_column_widths(nvlist_t *be_props, list_options_t *options, list_value_widths_t *widths) {
     int active_width = 0;
 
     if ((set_column_width_lookup(be_props, &widths->name, "name") != 0) ||
@@ -57,7 +56,6 @@ compute_column_widths(nvlist_t *be_props, list_options_t *options, list_value_wi
         widths->active = active_width;
     }
 
-
     // TODO: ??
 
     return 0;
@@ -69,24 +67,22 @@ compute_column_widths(nvlist_t *be_props, list_options_t *options, list_value_wi
  * @param bootenvs
  * @param options
  */
-static void
-print_bes(libze_handle *lzeh, nvlist_t **bootenvs, list_options_t *options) {
+static void print_bes(libze_handle *lzeh, nvlist_t **bootenvs, list_options_t *options) {
     nvpair_t *pair;
     nvlist_t *be_props;
-    char *string_prop;
-    char *tab_suffix = "\t";
+    char *    string_prop;
+    char *    tab_suffix = "\t";
 
     list_value_widths_t widths = {0};
 
     if (!options->tab_delimited) {
-        tab_suffix = "";
-        widths.name = strlen(HEADER_NAME);
-        widths.active = strlen(HEADER_ACTIVE);
+        tab_suffix        = "";
+        widths.name       = strlen(HEADER_NAME);
+        widths.active     = strlen(HEADER_ACTIVE);
         widths.mountpoint = strlen(HEADER_MOUNTPOINT);
-        widths.spaceused = strlen(HEADER_SPACEUSED);
-        widths.creation = strlen(HEADER_CREATION);
-        for (pair = nvlist_next_nvpair(*bootenvs, NULL); pair != NULL;
-             pair = nvlist_next_nvpair(*bootenvs, pair)) {
+        widths.spaceused  = strlen(HEADER_SPACEUSED);
+        widths.creation   = strlen(HEADER_CREATION);
+        for (pair = nvlist_next_nvpair(*bootenvs, NULL); pair != NULL; pair = nvlist_next_nvpair(*bootenvs, pair)) {
             nvpair_value_nvlist(pair, &be_props);
             compute_column_widths(be_props, options, &widths);
         }
@@ -102,8 +98,7 @@ print_bes(libze_handle *lzeh, nvlist_t **bootenvs, list_options_t *options) {
         fputs("\n", stdout);
     }
 
-    for (pair = nvlist_next_nvpair(*bootenvs, NULL); pair != NULL;
-         pair = nvlist_next_nvpair(*bootenvs, pair)) {
+    for (pair = nvlist_next_nvpair(*bootenvs, NULL); pair != NULL; pair = nvlist_next_nvpair(*bootenvs, pair)) {
         nvpair_value_nvlist(pair, &be_props);
 
         if (nvlist_lookup_string(be_props, "name", &string_prop) == 0) {
@@ -113,7 +108,7 @@ print_bes(libze_handle *lzeh, nvlist_t **bootenvs, list_options_t *options) {
             printf("%-*s%s", (int)widths.name, buf, tab_suffix);
         }
 
-        char active_buff[3] = "";
+        char      active_buff[3] = "";
         boolean_t nextboot;
         if (nvlist_lookup_boolean_value(be_props, "nextboot", &nextboot) == 0) {
             if (nextboot) {
@@ -141,36 +136,36 @@ print_bes(libze_handle *lzeh, nvlist_t **bootenvs, list_options_t *options) {
 }
 
 /**
- * @brief TODO
- * @param lzeh Initialized libze handle
- * @param argc The number of given arguments
- * @param argv The given arguments in a list
- * @return
+ * @brief List command main function
+ * @param lzeh Initialized handle to libze object
+ * @param argc As passed to main
+ * @param argv As passed to main
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_UNKNOWN TODO comment error
  */
-libze_error
-ze_list(libze_handle *lzeh, int argc, char **argv) {
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-    int opt;
+libze_error ze_list(libze_handle *lzeh, int argc, char **argv) {
+    libze_error    ret = LIBZE_ERROR_SUCCESS;
+    int            opt;
     list_options_t options = {B_FALSE};
-    nvlist_t *outnvl;
+    nvlist_t *     outnvl;
 
     opterr = 0;
 
     // TODO: aDs
     while ((opt = getopt(argc, argv, "H")) != -1) {
         switch (opt) {
-//            case 'a':
-//                options.all = B_TRUE;
-//                break;
+                //            case 'a':
+                //                options.all = B_TRUE;
+                //                break;
             case 'D':
                 options.spaceused = B_TRUE;
                 break;
             case 'H':
                 options.tab_delimited = B_TRUE;
                 break;
-//            case 's':
-//                options.snapshots = B_TRUE;
-//                break;
+                //            case 's':
+                //                options.snapshots = B_TRUE;
+                //                break;
             default:
                 fprintf(stderr, "%s list: unknown option '-%c'\n", ZE_PROGRAM, optopt);
                 ze_usage();

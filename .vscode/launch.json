@@ -10,8 +10,8 @@
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
             "args": [
-                "snapshot",
-                "default",
+                "unmount",
+                "kubuntu19_backup"
             ],
             "cwd": "${workspaceFolder}",
             "environment": [],

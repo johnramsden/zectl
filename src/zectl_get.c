@@ -1,8 +1,8 @@
 #include "zectl.h"
 #include "zectl_util.h"
 
-#define HEADER_PROPERTY   "PROPERTY"
-#define HEADER_VALUE      "VALUE"
+#define HEADER_PROPERTY "PROPERTY"
+#define HEADER_VALUE "VALUE"
 
 typedef struct get_value_widths {
     size_t property;
@@ -13,24 +13,24 @@ typedef struct get_options {
     boolean_t tab_delimited;
 } get_options;
 
-static libze_error
-print_properties(libze_handle *lzeh, nvlist_t *properties, get_options *options) {
-    nvpair_t *pair = NULL;
-    nvlist_t *prop = NULL;
-    char *tab_suffix = "\t";
-    get_value_widths widths = {0};
+/**
+ * @brief TODO comment
+ */
+static libze_error print_properties(libze_handle *lzeh, nvlist_t *properties, get_options *options) {
+    nvpair_t *       pair       = NULL;
+    nvlist_t *       prop       = NULL;
+    char *           tab_suffix = "\t";
+    get_value_widths widths     = {0};
 
     if (!options->tab_delimited) {
         widths.property = strlen(HEADER_PROPERTY);
-        widths.value = strlen(HEADER_VALUE);
-        for (pair = nvlist_next_nvpair(properties, NULL); pair != NULL;
-             pair = nvlist_next_nvpair(properties, pair)) {
+        widths.value    = strlen(HEADER_VALUE);
+        for (pair = nvlist_next_nvpair(properties, NULL); pair != NULL; pair = nvlist_next_nvpair(properties, pair)) {
             nvpair_value_nvlist(pair, &prop);
 
             if ((set_column_width_lookup(prop, &widths.value, "value") != 0) ||
                 (set_column_width(&widths.property, nvpair_name(pair)))) {
-                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                        "Failed getting property widths");
+                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed getting property widths.\n");
             }
         }
 
@@ -42,8 +42,7 @@ print_properties(libze_handle *lzeh, nvlist_t *properties, get_options *options)
         fputs("\n", stdout);
     }
 
-    for (pair = nvlist_next_nvpair(properties, NULL); pair != NULL;
-         pair = nvlist_next_nvpair(properties, pair)) {
+    for (pair = nvlist_next_nvpair(properties, NULL); pair != NULL; pair = nvlist_next_nvpair(properties, pair)) {
         nvpair_value_nvlist(pair, &prop);
         char *string_prop;
         printf("%-*s%s", (int)widths.property, nvpair_name(pair), tab_suffix);
@@ -55,21 +54,20 @@ print_properties(libze_handle *lzeh, nvlist_t *properties, get_options *options)
 
     return LIBZE_ERROR_SUCCESS;
 }
+
 /**
- * get command main function
+ * Get command main function
  * @param lzeh Initialized handle to libze object
  * @param argc As passed to main
- * @param argv As passed to main, contains boot env to create
- * @return LIBZE_ERROR_SUCCESS upon success
+ * @param argv As passed to main, contains TODO
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p TODO
  */
-libze_error
-ze_get(libze_handle *lzeh, int argc, char **argv) {
+libze_error ze_get(libze_handle *lzeh, int argc, char **argv) {
 
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-    nvlist_t *properties = NULL;
-    get_options options = {
-            .tab_delimited = B_FALSE
-    };
+    libze_error ret        = LIBZE_ERROR_SUCCESS;
+    nvlist_t *  properties = NULL;
+    get_options options    = {.tab_delimited = B_FALSE};
 
     opterr = 0;
     int opt;
@@ -98,7 +96,8 @@ ze_get(libze_handle *lzeh, int argc, char **argv) {
     boolean_t dealloc_properties = B_FALSE;
     if ((argc == 0) || (strcmp(prop, "all") == 0)) {
         properties = lzeh->ze_props;
-    } else {
+    }
+    else {
         properties = fnvlist_alloc();
         if (properties == NULL) {
             return LIBZE_ERROR_NOMEM;

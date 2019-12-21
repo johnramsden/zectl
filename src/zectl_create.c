@@ -1,24 +1,21 @@
 #include "zectl.h"
 
 /**
- * create command main function
+ * @brief Create command main function
  * @param lzeh Initialized handle to libze object
  * @param argc As passed to main
  * @param argv As passed to main, contains boot env to create
- * @return LIBZE_ERROR_SUCCESS upon success
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p TODO comment error
  */
-libze_error
-ze_create(libze_handle *lzeh, int argc, char **argv) {
+libze_error ze_create(libze_handle *lzeh, int argc, char **argv) {
 
     libze_bootloader bootloader;
 
-    libze_create_options be_clone = {
-            .existing = B_FALSE,
-            .recursive = B_FALSE
-    };
+    libze_create_options be_clone = {.existing = B_FALSE, .recursive = B_FALSE};
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
-    bootloader.set = B_FALSE;
+    bootloader.set  = B_FALSE;
 
     char *be_existing = NULL;
 
@@ -27,7 +24,7 @@ ze_create(libze_handle *lzeh, int argc, char **argv) {
     while ((opt = getopt(argc, argv, "e:r")) != -1) {
         switch (opt) {
             case 'e':
-                be_existing = optarg;
+                be_existing       = optarg;
                 be_clone.existing = B_TRUE;
                 break;
             case 'r':
@@ -44,7 +41,7 @@ ze_create(libze_handle *lzeh, int argc, char **argv) {
     argv += optind;
 
     if (argc != 1) {
-        fprintf(stderr, "%s create: wrong number of arguments\n", ZE_PROGRAM);
+        fprintf(stderr, "%s create: wrong number of arguments.\n", ZE_PROGRAM);
         ze_usage();
         return LIBZE_ERROR_UNKNOWN;
     }

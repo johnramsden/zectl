@@ -14,14 +14,12 @@
 
 typedef enum system_fs_error {
     SYSTEM_ERR_SUCCESS = 0,
-    SYSTEM_ERR_MNT_FILE,                // Non-existent or invalid path to mnt file
+    SYSTEM_ERR_MNT_FILE, // Non-existent or invalid path to mnt file
     SYSTEM_ERR_NOT_FOUND,
     SYSTEM_ERR_WRONG_FSTYPE,
     SYSTEM_ERR_UNKNOWN
 } system_fs_error;
 
-system_fs_error
-libze_dataset_from_mountpoint(char mountpoint[static 1], size_t buflen, char dataset_buf[buflen]);
+system_fs_error libze_dataset_from_mountpoint(char mountpoint[static 1], size_t buflen, char dataset_buf[buflen]);
 
-
-#endif //ZE_SYSTEM_LINUX_H
+#endif // ZE_SYSTEM_LINUX_H

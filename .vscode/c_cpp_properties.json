@@ -4,6 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
+                "/usr/include/**",
                 "/usr/include/libzfs/**",
                 "/usr/include/libspl/**"
             ],

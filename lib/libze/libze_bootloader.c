@@ -12,15 +12,14 @@
  * @pre bootloader != NULL
  * @pre (ze_namespace != NULL) && (strlen(ze_namespace) >= 1)
  */
-libze_error
-libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]) {
+libze_error libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]) {
     nvlist_t *out_props = NULL;
     if (libze_be_props_get(lzeh, &out_props, ze_namespace) != LIBZE_ERROR_SUCCESS) {
         return LIBZE_ERROR_UNKNOWN;
     }
 
     char prop[ZFS_MAXPROPLEN] = "";
-    if (libze_util_concat(ze_namespace, ":", "bootloader", ZFS_MAXPROPLEN, prop) != 0) {
+    if (libze_util_concat(ze_namespace, ":", "bootloader", ZFS_MAXPROPLEN, prop)) {
         return LIBZE_ERROR_UNKNOWN;
     }
 
@@ -34,10 +33,10 @@ libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const ch
 /**
  * @brief Close bootloader
  * @param[in] bootloader Initialized bootloader
- * @return LIBZE_ERROR_SUCCESS on success
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p TODO
  */
-libze_error
-libze_bootloader_fini(libze_bootloader *bootloader) {
+libze_error libze_bootloader_fini(libze_bootloader *bootloader) {
     if ((bootloader != NULL) && (bootloader->prop != NULL)) {
         fnvlist_free(bootloader->prop);
     }
