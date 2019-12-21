@@ -626,12 +626,12 @@ libze_error libze_boot_pool_set(libze_handle *lzeh) {
     if (strlen(bootpool_root_path) == 0) {
         // No parameters are set, assume there is no separate boot pool
         lzeh->bootpool.pool_zhdl = NULL;
-        (void)strlcat(lzeh->bootpool.zpool_name, "", ZFS_MAX_DATASET_NAME_LEN);
-        (void)strlcat(lzeh->bootpool.root_path, "", ZFS_MAX_DATASET_NAME_LEN);
-        (void)strlcat(lzeh->bootpool.root_path_full, "", ZFS_MAX_DATASET_NAME_LEN);
-        (void)strlcat(lzeh->bootpool.dataset_prefix, "", ZFS_MAX_DATASET_NAME_LEN);
-        (void)strlcat(lzeh->bootpool.env_activated_path, "", ZFS_MAX_DATASET_NAME_LEN);
-        (void)strlcat(lzeh->bootpool.env_running_path, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.zpool_name, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.root_path, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.root_path_full, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.dataset_prefix, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.env_activated_path, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.env_running_path, "", ZFS_MAX_DATASET_NAME_LEN);
         return ret;
     }
 
@@ -831,12 +831,12 @@ libze_handle *libze_init(void) {
 
     // Clear bootpool, initialization is done later
     lzeh->bootpool.pool_zhdl = NULL;
-    (void)strlcat(lzeh->bootpool.zpool_name, "", ZFS_MAX_DATASET_NAME_LEN);
-    (void)strlcat(lzeh->bootpool.root_path, "", ZFS_MAX_DATASET_NAME_LEN);
-    (void)strlcat(lzeh->bootpool.root_path_full, "", ZFS_MAX_DATASET_NAME_LEN);
-    (void)strlcat(lzeh->bootpool.dataset_prefix, "", ZFS_MAX_DATASET_NAME_LEN);
-    (void)strlcat(lzeh->bootpool.env_activated_path, "", ZFS_MAX_DATASET_NAME_LEN);
-    (void)strlcat(lzeh->bootpool.env_running_path, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.zpool_name, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.root_path, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.root_path_full, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.dataset_prefix, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.env_activated_path, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.env_running_path, "", ZFS_MAX_DATASET_NAME_LEN);
 
     (void)libze_error_clear(lzeh);
 
