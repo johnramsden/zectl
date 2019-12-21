@@ -38,7 +38,7 @@ typedef struct libze_plugin_fn_export libze_plugin_fn_export;
  * @invariant If bootpool exists: pool_zhdl != NULL && all strings not empty (strlen >= 1)
  *            Else:               pool_zhdl == NULL and all strings empty (strlen == 0)
  */
-typedef struct bootpool {
+typedef struct libze_bootpool {
     zpool_handle_t *pool_zhdl; /**< A handle to the boot zpool                                           */
     char zpool_name[ZFS_MAX_DATASET_NAME_LEN]; /**< ZFS Pool name for all boot datasets of all boot environments     */
     char root_path[ZFS_MAX_DATASET_NAME_LEN];  /**< Dataset root path (e.g. "bpool/boot/env")      */
@@ -49,7 +49,7 @@ typedef struct bootpool {
                                                             environment */
     char env_running_path[ZFS_MAX_DATASET_NAME_LEN];   /**< Path to the boot dataset of the currently running boot
                                                             environment   */
-} bootpool_t;
+} libze_bootpool;
 
 /**
  * @struct
@@ -61,7 +61,7 @@ typedef struct bootpool {
 typedef struct libze_zfs_dataset {
     zfs_handle_t *dataset_zhdl;                           /**< Handle to opened ZFS datset */
     char          dataset_path[ZFS_MAX_DATASET_NAME_LEN]; /**< Actual path to the dataset  */
-} zfs_dataset_t;
+} libze_zfs_dataset;
 
 /**
  * @struct libze_handle
@@ -90,7 +90,7 @@ struct libze_handle {
     char env_activated_path[ZFS_MAX_DATASET_NAME_LEN]; /**< Path of the currently activated boot environment */
     char env_running[ZFS_MAX_DATASET_NAME_LEN];      /**< Currently running boot environment                         */
     char env_running_path[ZFS_MAX_DATASET_NAME_LEN]; /**< Path to the currently running boot environment             */
-    bootpool_t              bootpool;                /**< Stores information about an additional bootpool if present */
+    libze_bootpool          bootpool;                /**< Stores information about an additional bootpool if present */
     libze_plugin_fn_export *lz_funcs;                /**< Pointer to bootloader plugin                               */
     nvlist_t *              ze_props;                /**< User org.zectl properties                                  */
     char libze_error_message[LIBZE_MAX_ERROR_LEN];   /**< Last error buffer                                          */
@@ -151,7 +151,7 @@ libze_error libze_snapshot(libze_handle *lzeh, const char boot_environment[stati
 libze_error libze_unmount(libze_handle *lzeh, const char boot_environment[static 1]);
 
 libze_handle *libze_init(void);
-void libze_fini(libze_handle *lzeh);
+void          libze_fini(libze_handle *lzeh);
 
 libze_error libze_boot_pool_set(libze_handle *lzeh);
 libze_error libze_boot_env_name(libze_handle *lzeh, const char *dataset, size_t buflen, char *buf);
