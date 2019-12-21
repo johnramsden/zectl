@@ -32,6 +32,9 @@ libze_util_suffix_after_string(const char root[static 1], const char dataset[sta
 int
 libze_get_root_dataset(libze_handle *lzeh);
 
+int
+libze_get_zpool_name_from_dataset(const char dataset[static 3], size_t buflen, char buf[buflen]);
+
 boolean_t
 libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]);
 boolean_t

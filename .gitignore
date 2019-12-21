@@ -3,6 +3,7 @@
 .Trash*
 cmake-build-*
 .idea
+build
 
 src/zcp\.h
 
