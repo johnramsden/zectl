@@ -7,6 +7,7 @@
 #include "libze/libze_util.h"
 
 #define REGEX_BUFLEN 512
+#define REGEX_MAX_MATCHES 25
 #define SYSTEMDBOOT_ENTRY_PREFIX "org.zectl"
 
 #define NUM_SYSTEMDBOOT_PROPERTY_VALUES 2
@@ -155,7 +156,7 @@ static libze_error
 form_unit_regex(char reg_buf[REGEX_BUFLEN],
                char prefix[LIBZE_MAX_PATH_LEN],
                char suffix[ZFS_MAX_DATASET_NAME_LEN]) {
-    //  "^[\\t ]*What=\\/efi\\/env\\/default[\\t ]*$"
+
     int ret = snprintf(reg_buf, REGEX_BUFLEN,
                        "^[\t ]*%s[\t ]*=[\t ]*%s[\t\n ]*$",
                        prefix, suffix);
@@ -203,7 +204,7 @@ form_loader_config(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
 }
 
 static libze_error
-file_accessible(libze_handle *lzeh, char unit_buf[LIBZE_MAX_PATH_LEN]) {
+file_accessible(libze_handle *lzeh, const char unit_buf[LIBZE_MAX_PATH_LEN]) {
     /* Check if boot.mount is r/w */
     errno = 0;
     if (access(unit_buf, R_OK|W_OK) != 0) {
@@ -271,6 +272,7 @@ copy_matched(libze_handle *lzeh,
 
     return LIBZE_ERROR_SUCCESS;
 }
+
 /**
  * @brief Using boot mountpoint update .mount unit string
  * @param lzeh               libze handle
@@ -418,6 +420,111 @@ err:
 }
 
 /**
+ * @brief TODO
+ * @param lzeh
+ * @param filename
+ * @param filename_new
+ * @param be_name
+ * @param regexp
+ * @return
+ */
+static libze_error
+replace_matched(libze_handle *lzeh,
+                const char filename[LIBZE_MAX_PATH_LEN],
+                const char filename_new[LIBZE_MAX_PATH_LEN],
+                const char be_name[LIBZE_MAX_PATH_LEN],
+                const char be_name_active[LIBZE_MAX_PATH_LEN]) {
+
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    FILE* file_new = fopen(filename_new, "w+");
+    if (file_new == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to open %s.\n", file_new);
+    }
+
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        fclose(file_new);
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to open %s.\n", filename);
+    }
+
+    char line_buf[LIBZE_MAX_PATH_LEN];
+    char replace_line_buf[LIBZE_MAX_PATH_LEN];
+    while (fgets(line_buf, LIBZE_MAX_PATH_LEN, file)) {
+        /* TODO: Rewrite to be 'selective' and match each line based on regex */
+        ret = libze_util_replace_string(be_name_active, be_name,
+                LIBZE_MAX_PATH_LEN, line_buf, LIBZE_MAX_PATH_LEN, replace_line_buf);
+        if (ret != LIBZE_ERROR_SUCCESS) {
+            goto err;
+        }
+        fwrite(replace_line_buf, 1, strlen(replace_line_buf), file_new);
+    }
+
+    fflush(file_new);
+
+err:
+    fclose(file);
+    fclose(file_new);
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+/**
+ * @brief TODO
+ * @param lzeh
+ * @param activate_data
+ * @param active_be
+ * @param filename
+ * @return
+ */
+static libze_error
+replace_be_name(libze_handle *lzeh,
+                const char be_name[ZFS_MAX_DATASET_NAME_LEN],
+                const char active_be[ZFS_MAX_DATASET_NAME_LEN],
+                const char filename[LIBZE_MAX_PATH_LEN],
+                const char new_filename[LIBZE_MAX_PATH_LEN]) {
+
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    int interr = 0;
+
+    if ((ret = file_accessible(lzeh, filename)) != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    /* Setup regular expression */
+    char reg_buf[REGEX_BUFLEN];
+    if (strlcpy(reg_buf, active_be, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Regex exceeds max path length.\n");
+    }
+
+    regex_t regexp;
+    interr = regcomp(&regexp, reg_buf, 0);
+    if (interr != 0) {
+        char buf[LIBZE_MAX_ERROR_LEN];
+        (void)regerror(interr, &regexp, buf, LIBZE_MAX_ERROR_LEN);
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Regex %s failed to compile:\n%s\n", reg_buf, buf);
+        goto err;
+    }
+
+    // TODO:
+    ret = replace_matched(lzeh, filename, new_filename, be_name, active_be);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Failed to replace %s in %s.\n", be_name, filename);
+        goto err;
+    }
+
+err:
+    regfree(&regexp);
+    return ret;
+}
+
+
+/**
  * @brief Run mid-activate hook
  * @param lzeh Initialized libze handle
  * @param be_mountpoint
@@ -514,8 +621,13 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
                 "BE loader path exceeds max path length.\n");
     }
 
-    char loader_buf[LIBZE_MAX_PATH_LEN];
-    char new_loader_buf[LIBZE_MAX_PATH_LEN];
+    ret = replace_be_name(lzeh, be_name, active_be, loader_buf, new_loader_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Failed to replace '%s' in '%s' with '%s'.\n",
+                active_be, new_loader_buf, be_name);
+    }
+
     ret = form_loader_path(efi_mountpoint, "env", active_be, loader_buf);
     if (ret == LIBZE_ERROR_SUCCESS) {
         ret = form_loader_path(efi_mountpoint, "env", be_name, new_loader_buf);
@@ -525,21 +637,6 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
     }
 
     iret = libze_util_copydir(loader_buf, new_loader_buf);
-    if (iret != 0) {
-        // TODO: Check error, return better message
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed to copy %s -> %s.\n", loader_buf, new_loader_buf);
-    }
-
-    ret = form_loader_config(efi_mountpoint, active_be, loader_buf);
-    if (ret == LIBZE_ERROR_SUCCESS) {
-        ret = form_loader_config(efi_mountpoint, be_name, new_loader_buf);
-    }
-    if (ret != LIBZE_ERROR_SUCCESS) {
-        return ret;
-    }
-
-    iret = libze_util_copy_file(loader_buf, new_loader_buf);
     if (iret != 0) {
         // TODO: Check error, return better message
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
