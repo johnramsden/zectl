@@ -58,7 +58,7 @@ typedef struct bootpool {
  * @invariant if linked boot dataset available: ((dataset_zhdl != NULL) && (strlen(dataset_path) >= 1))
  *            else                              ((dataset_zhdl == NULL) && (strlen(dataset_path) == 0))
  */
-typedef struct zfs_dataset_t {
+typedef struct libze_zfs_dataset {
     zfs_handle_t *dataset_zhdl;                           /**< Handle to opened ZFS datset */
     char          dataset_path[ZFS_MAX_DATASET_NAME_LEN]; /**< Actual path to the dataset  */
 } zfs_dataset_t;
