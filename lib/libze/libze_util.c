@@ -378,3 +378,106 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
 
     return 0;
 }
+
+/**
+ * @brief Global string search and replace
+ * @param to_replace String to replace
+ * @param replacement Replacement string
+ * @param line_length Line length
+ * @param line Line to search
+ * @param line_replaced_length line_replaced length
+ * @param line_replaced Modified line
+ * @return @p LIBZE_ERROR_SUCCESS on success
+ *         @p LIBZE_ERROR_MAXPATHLEN When LIBZE_MAX_PATH_LEN exceeded
+ *         @p LIBZE_ERROR_NOMEM
+ */
+libze_error
+libze_util_replace_string(const char *to_replace, const char *replacement,
+                          size_t line_length,
+                          const char line[line_length],
+                          size_t line_replaced_length,
+                          char line_replaced[line_replaced_length]) {
+
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    char *result_buf = NULL;
+    char *insert_location = NULL;
+
+    /* Distance between replacement and last replacement */
+    size_t len_between_replacements;
+
+    /* Number of occurances of to_replace */
+    int count;
+
+    size_t len_rep = strlen(to_replace);
+    // Empty replacement, skip
+    if (len_rep == 0) {
+        if (strlcpy(line_replaced, line, line_replaced_length) >= line_replaced_length) {
+            return LIBZE_ERROR_MAXPATHLEN;
+        }
+        return LIBZE_ERROR_SUCCESS;
+    }
+
+    size_t len_with;
+    if (replacement == NULL) {
+        replacement = "";
+    }
+    len_with = strlen(replacement);
+
+    char tmp_line[line_length];
+    if (strlcpy(tmp_line, line, line_length) >= line_length) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+    /* remainder of line after last replacement */
+    char *tmp_line_loc = tmp_line;
+
+    /* Count the number of replacements */
+    char *replace_loc;
+    insert_location = tmp_line;
+    for (count = 0; (replace_loc = strstr(insert_location, to_replace)); ++count) {
+        insert_location = replace_loc + len_rep;
+    }
+
+    size_t buf_size = strlen(tmp_line) + (len_with - len_rep) * count + 1;
+    size_t buf_left = buf_size;
+
+    result_buf = malloc(buf_size);
+    if (result_buf == NULL) {
+        return LIBZE_ERROR_NOMEM;
+    }
+
+    /* end of the result string */
+    char *result_end = result_buf;
+    while ((count--) > 0) {
+        /* next occurrence of to_replace in line */
+        insert_location = strstr(tmp_line_loc, to_replace);
+        len_between_replacements = insert_location - tmp_line_loc;
+
+        /* Copy len_between_replacements to result_end */
+        result_end = strncpy(result_end, tmp_line_loc, len_between_replacements) + len_between_replacements;
+
+        buf_left = buf_size - (result_end - result_buf);
+        if (strlcpy(result_end, replacement, buf_left) >= buf_left) {
+            ret = LIBZE_ERROR_MAXPATHLEN;
+            goto err;
+        }
+
+        result_end += len_with;
+
+        /* Go to next replacement */
+        tmp_line_loc += len_between_replacements + len_rep;
+    }
+
+    buf_left = buf_size - (result_end - result_buf);
+    if (strlcpy(result_end, tmp_line_loc, buf_left) >= buf_left) {
+        ret = LIBZE_ERROR_MAXPATHLEN;
+        goto err;
+    }
+
+    if (strlcpy(line_replaced, result_buf, line_replaced_length) >= line_replaced_length) {
+        ret = LIBZE_ERROR_MAXPATHLEN;
+    }
+
+err:
+    free(result_buf);
+    return ret;
+}

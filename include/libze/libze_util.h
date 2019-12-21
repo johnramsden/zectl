@@ -48,6 +48,13 @@ libze_util_copy_file(const char *filename, const char *new_filename);
 
 int
 libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
-                          const char new_directory_path[LIBZE_MAX_PATH_LEN]);
+                   const char new_directory_path[LIBZE_MAX_PATH_LEN]);
+
+libze_error
+libze_util_replace_string(const char *to_replace, const char *replacement,
+                          size_t line_length,
+                          const char line[line_length],
+                          size_t line_replaced_length,
+                          char line_replaced[line_replaced_length]);
 
 #endif //ZECTL_LIBZE_UTIL_H
