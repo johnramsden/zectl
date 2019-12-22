@@ -1956,11 +1956,6 @@ libze_error
 libze_list(libze_handle *lzeh, nvlist_t **outnvl) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    if ((libzfs_core_init()) != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_LIBZFS, "Failed to initialize libzfs_core.\n");
-        goto err;
-    }
-
     // Get be root handle
     zfs_handle_t *zroot_hdl = NULL;
     if ((zroot_hdl = zfs_open(lzeh->lzh, lzeh->env_root, ZFS_TYPE_FILESYSTEM)) == NULL) {
@@ -1983,7 +1978,6 @@ libze_list(libze_handle *lzeh, nvlist_t **outnvl) {
 
 err:
     zfs_close(zroot_hdl);
-    libzfs_core_fini();
     return ret;
 }
 
