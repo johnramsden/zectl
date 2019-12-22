@@ -2354,7 +2354,7 @@ libze_rename(libze_handle *lzeh, const char boot_environment[static 1],
             goto err;
         }
 
-        if (zfs_is_mounted(be_zh, NULL)) {
+        if (zfs_is_mounted(boot_pool_zh, NULL)) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                     "Dataset %s is mounted, cannot rename\n", boot_pool_ds_buffer);
             goto err;
