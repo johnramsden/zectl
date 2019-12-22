@@ -976,6 +976,54 @@ libze_activate_cb(zfs_handle_t *zhdl, void *data) {
 }
 
 /**
+ * @brief Activate the boot pool dataset
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] boot_environment Boot environment name to activate boot pool dataset for
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_EEXIST if the requested boot pool dataset nonexistent,
+ *         @p LIBZE_ERROR_MAXPATHLEN if the name of a dataset or path is longer than allowed,
+ *         @p LIBZE_ERROR_UNKNOWN if the dataset can't be activated,
+ *         @p LIBZE_ERROR_ZFS_OPEN if the requested boot pool dataset can't be opened
+ *
+ */
+libze_error activate_boot_pool(libze_handle *lzeh, const char boot_environment[static 1]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    if (lzeh->bootpool.pool_zhdl == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST, "No additional bootpool available.\n");
+    }
+
+    char target_dataset[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat(lzeh->bootpool.root_path_full, "", boot_environment, LIBZE_MAX_PATH_LEN, target_dataset) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "Name for the requested boot dataset (%s%s) is too long (%d).\n",
+                               lzeh->bootpool.root_path_full, boot_environment, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    if (!zfs_dataset_exists(lzeh->lzh, target_dataset, ZFS_TYPE_DATASET)) { // NOLINT(hicpp-signed-bitwise)
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST, "The requested boot dataset (%s) does not exist.\n",
+                               target_dataset);
+    }
+
+    zfs_handle_t *target_dataset_hndl = zfs_open(lzeh->lzh, target_dataset, ZFS_TYPE_FILESYSTEM);
+    if (target_dataset_hndl == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN, "Failed to open the requested boot dataset (%s).\n",
+                               target_dataset);
+    }
+
+    libze_activate_cbdata cbd = {lzeh};
+
+    // Set for top level dataset
+    if (libze_activate_cb(target_dataset_hndl, &cbd) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                              "Failed to activate the requested boot dataset on bootpool (%s).\n", target_dataset);
+    }
+
+err:
+    zfs_close(target_dataset_hndl);
+    return ret;
+}
+
+/**
  * @brief Function run mid-activate, execute plugin if it exists.
  * @param[in] lzeh Initialized @p libze_handle
  * @param[in] options Options to set properties based on
@@ -1089,7 +1137,6 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
                 "Boot environment %s does not exist\n", options->be_name);
     }
 
-
     if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_pre_activate(lzeh) != 0)) {
         return LIBZE_ERROR_PLUGIN;
     }
@@ -1122,6 +1169,10 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
     if (zfs_iter_filesystems(be_zh, libze_clone_cb, &cbd) != 0) {
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
+    }
+
+    if (lzeh->bootpool.pool_zhdl != NULL) {
+        (void)activate_boot_pool(lzeh, options->be_name);
     }
 
     if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_activate(lzeh, options->be_name) != 0)) {
@@ -2526,7 +2577,7 @@ typedef struct libze_umount_cb_data {
  * @param[in] boot_environment Boot environment name to unmount boot pool dataset for
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_EEXIST if the requested boot pool dataset nonexistent,
- *         @p LIBZE_ERROR_LIBZFS if the mountpoint property can't be retrieved
+ *         @p LIBZE_ERROR_LIBZFS if the mountpoint property can't be retrieved,
  *         @p LIBZE_ERROR_MAXPATHLEN if the name of a dataset or path is longer than allowed,
  *         @p LIBZE_ERROR_UNKNOWN if the dataset can't be unmounted,
  *         @p LIBZE_ERROR_ZFS_OPEN if the requested boot pool dataset can't be opened
