@@ -2345,6 +2345,10 @@ libze_rename(libze_handle *lzeh, const char boot_environment[static 1],
     switch (libze_validate_new_be(lzeh, new_boot_environment)) {
         case LIBZE_ERROR_SUCCESS:
             break;
+        case LIBZE_ERROR_MAXPATHLEN:
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                    "A path of the new boot environment (%s) exceeds max length (%d).\n",
+                    new_boot_environment, ZFS_MAX_DATASET_NAME_LEN);
         case LIBZE_ERROR_EEXIST:
             return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
                     "The new boot environment (%s) already exists.\n", new_boot_environment);
