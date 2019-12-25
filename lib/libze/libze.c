@@ -984,7 +984,8 @@ libze_activate_cb(zfs_handle_t *zhdl, void *data) {
  *         @p LIBZE_ERROR_ZFS_OPEN if the requested boot pool dataset can't be opened
  *
  */
-libze_error activate_boot_pool(libze_handle *lzeh, const char boot_environment[static 1]) {
+static libze_error
+activate_boot_pool(libze_handle *lzeh, const char boot_environment[static 1]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
     if (lzeh->bootpool.pool_zhdl == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_EEXIST, "No additional bootpool available.\n");
@@ -1825,7 +1826,7 @@ destroy_snapshot(libze_handle *lzeh, libze_destroy_options *options,
  *         @p LIBZE_ERROR_ZFS_OPEN if @p filesystem can't be opened
  */
 static libze_error
-libze_destroy_boot_pool(libze_handle *lzeh, libze_destroy_options *options) {
+destroy_boot_pool(libze_handle *lzeh, libze_destroy_options *options) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
     if (lzeh->bootpool.pool_zhdl == NULL) {
@@ -1884,7 +1885,7 @@ libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
             return ret;
         }
 
-        if ((ret = libze_destroy_boot_pool(lzeh, options)) != LIBZE_ERROR_SUCCESS) {
+        if ((ret = destroy_boot_pool(lzeh, options)) != LIBZE_ERROR_SUCCESS) {
             return ret;
         }
     } else {
@@ -2082,7 +2083,8 @@ directory_create_if_nonexistent(const char path[static 1]) {
  *
  * @pre mount_directory != NULL and points to a valid directory
  */
-libze_error mount_boot_pool(libze_handle *lzeh, const char boot_environment[static 1],
+static libze_error
+mount_boot_pool(libze_handle *lzeh, const char boot_environment[static 1],
                             const char mount_directory[ZFS_MAX_DATASET_NAME_LEN]) {
 
     if (lzeh->bootpool.pool_zhdl == NULL) {
@@ -2573,7 +2575,8 @@ typedef struct libze_umount_cb_data {
  *         @p LIBZE_ERROR_ZFS_OPEN if the requested boot pool dataset can't be opened
  *
  */
-libze_error unmount_boot_pool(libze_handle *lzeh, const char boot_environment[static 1]) {
+static libze_error
+unmount_boot_pool(libze_handle *lzeh, const char boot_environment[static 1]) {
     if (lzeh->bootpool.pool_zhdl == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_EEXIST, "No additional bootpool available.\n");
     }
