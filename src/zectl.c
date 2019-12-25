@@ -67,7 +67,7 @@ get_command(command_map_t *ze_command_map,
 }
 
 /**
- * @brief Helper function to set default proprrties
+ * @brief Helper function to set default properties
  * @param[in] lzeh Initialized lzeh libze handle
  * @return 0 on success, nonzero on failure
  *
@@ -173,7 +173,7 @@ main(int argc, char *argv[]) {
     }
 
     if (define_default_props(lzeh) != 0) {
-        fprintf(stderr, "%s: Failed to set default propertiess\n", ZE_PROGRAM);
+        fprintf(stderr, "%s: Failed to set default properties\n", ZE_PROGRAM);
         ret = EXIT_FAILURE;
         goto fin;
     }

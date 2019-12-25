@@ -491,7 +491,7 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
         return errno;
     }
 
-    /* Check error after for TOCTOU race conditon */
+    /* Check error after for TOCTOU race condition */
     int err = mkdir(new_directory_path, 0700);
     if (err != 0) {
         errno = 0;
@@ -592,7 +592,7 @@ libze_util_replace_string(const char *to_replace, const char *replacement,
     /* Distance between replacement and last replacement */
     size_t len_between_replacements;
 
-    /* Number of occurances of to_replace */
+    /* Number of occurrences of to_replace */
     int count;
 
     size_t len_rep = strlen(to_replace);

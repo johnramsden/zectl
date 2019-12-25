@@ -418,7 +418,7 @@ libze_be_props_get(libze_handle *lzeh, nvlist_t **result, const char *namespace)
 
     if ((user_props = zfs_get_user_props(zhp)) == NULL) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed to retieve user properties for %s.\n", zfs_get_name(zhp));
+                "Failed to retrieve user properties for %s.\n", zfs_get_name(zhp));
         goto err;
     }
 
@@ -894,7 +894,7 @@ err:
  *
  * @post @p lzeh->lzh is closed
  * @post @p lzeh->pool_zhdl is closed
- * @post @p llzeh->bootpool.pool_zhdl is closed
+ * @post @p lzeh->bootpool.pool_zhdl is closed
  * @post @p lzeh->ze_props is free'd
  * @post @p lzeh is free'd
  */
@@ -1097,7 +1097,7 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
 
 err:
     if (!is_root && zfs_is_mounted(be_zh, NULL)) {
-        // Retain existing error if occurrred
+        // Retain existing error if occurred
         if ((zfs_unmount(be_zh, NULL, 0) != 0) && (ret != LIBZE_ERROR_SUCCESS)) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                     "Failed to unmount %s", ds_name);
@@ -1727,7 +1727,7 @@ libze_destroy_cb(zfs_handle_t *zh, void *data) {
  * @param filesystem Clone or boot environment full name
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_ZFS_OPEN if @p filesystem can't be opened,
- *         @p LIBZE_ERROR_EEXIST if @p filesystem doesnt exist,
+ *         @p LIBZE_ERROR_EEXIST if @p filesystem doesn't exist,
  */
 static libze_error
 destroy_filesystem(libze_handle *lzeh, libze_destroy_options *options,
@@ -1765,7 +1765,7 @@ destroy_filesystem(libze_handle *lzeh, libze_destroy_options *options,
  * @param snapshot Snapshot full name
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_ZFS_OPEN if @p snapshot dataset can't be opened,
- *         @p LIBZE_ERROR_EEXIST if @p snapshot doesnt exist, or isnt a BE,
+ *         @p LIBZE_ERROR_EEXIST if @p snapshot doesn't exist, or isn't a BE,
  *         @p LIBZE_ERROR_MAXPATHLEN if snapshot name is too long
  */
 static libze_error
@@ -2470,7 +2470,7 @@ libze_set(libze_handle *lzeh, nvlist_t *properties) {
  * @param[in] snap_suffix Snapshot name
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_MAXPATHLEN if max dataset or snapshot length exceeded,
- *         @p LIBZE_ERROR_EEXIST if boot pool dataset nonexsistent
+ *         @p LIBZE_ERROR_EEXIST if boot pool dataset nonexistent
  */
 static libze_error
 snapshot_boot_pool(libze_handle *lzeh, const char boot_environment[static 1],
@@ -2513,7 +2513,7 @@ snapshot_boot_pool(libze_handle *lzeh, const char boot_environment[static 1],
  * @param[in] boot_environment Boot environment name to snapshot
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_MAXPATHLEN if max dataset or snapshot length exceeded,
- *         @p LIBZE_ERROR_EEXIST if a datataset to snapshot is nonexsistent
+ *         @p LIBZE_ERROR_EEXIST if a datataset to snapshot is nonexistent
  */
 libze_error
 libze_snapshot(libze_handle *lzeh, const char boot_environment[static 1]) {
