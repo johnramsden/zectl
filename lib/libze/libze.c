@@ -670,7 +670,7 @@ libze_boot_pool_set(libze_handle *lzeh) {
     }
 
     char prop_buf[ZFS_MAXPROPLEN] = "";
-    if (zfs_prop_get(zph, ZFS_PROP_MOUNTPOINT, prop_buf, sizeof(prop_buf), NULL, NULL, 0, 1) != 0) {
+    if (zfs_prop_get(zph, ZFS_PROP_MOUNTPOINT, prop_buf, ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_LIBZFS, "Failed to get ZFS mountpoint property for %s.\n",
                                bootpool_root_path);
         goto err;
@@ -723,7 +723,7 @@ libze_boot_pool_set(libze_handle *lzeh) {
                                bootpool_ds_activated);
         goto err;
     }
-    if (zfs_prop_get(zph_activated, ZFS_PROP_MOUNTPOINT, prop_buf, sizeof(prop_buf), NULL, NULL, 0, 1) != 0) {
+    if (zfs_prop_get(zph_activated, ZFS_PROP_MOUNTPOINT, prop_buf, ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(
             lzeh, LIBZE_ERROR_LIBZFS,
             "Failed to get ZFS mountpoint property for dataset of the activated boot environment (%s).\n",
@@ -763,7 +763,7 @@ libze_boot_pool_set(libze_handle *lzeh) {
                                    bootpool_ds_running);
             goto err;
         }
-        if (zfs_prop_get(zph_running, ZFS_PROP_MOUNTPOINT, prop_buf, sizeof(prop_buf), NULL, NULL, 0, 1) != 0) {
+        if (zfs_prop_get(zph_running, ZFS_PROP_MOUNTPOINT, prop_buf, ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_LIBZFS,
                                    "Failed to get the ZFS mountpoint property of the running boot environment (%s).\n",
                                    bootpool_ds_running);
@@ -958,7 +958,7 @@ libze_activate_cb(zfs_handle_t *zhdl, void *data) {
 
     // Check if clone
     if (zfs_prop_get(zhdl, ZFS_PROP_ORIGIN, buf,
-            sizeof(buf), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         // Not a clone, continue
         return 0;
     }
@@ -1156,7 +1156,7 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
         goto err;
     }
 
-    (void)libze_util_concat(lzeh->env_root, "/", options->be_name, sizeof(be_dataset), be_dataset);
+    (void)libze_util_concat(lzeh->env_root, "/", options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_dataset);
     if (zpool_set_prop(lzeh->pool_zhdl, "bootfs", be_dataset) != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, 
                 "Failed to set the pool property 'bootfs=%s'.\n", be_dataset);
@@ -1234,8 +1234,8 @@ clone_prop_cb(int prop, void *data) {
         return ZPROP_CONT;
     }
 
-    if (zfs_prop_get(pcbd->zhp, prop, propbuf, sizeof(propbuf), &src, statbuf,
-            sizeof(statbuf), B_FALSE) != 0) {
+    if (zfs_prop_get(pcbd->zhp, prop, propbuf, ZFS_MAXPROPLEN, &src, statbuf,
+            ZFS_MAXPROPLEN, B_FALSE) != 0) {
         return ZPROP_CONT;
     }
 
@@ -1688,7 +1688,7 @@ libze_destroy_cb(zfs_handle_t *zh, void *data) {
     if ((strchr(zfs_get_name(zh), '@') == NULL) && cbd->options->destroy_origin) {
         // Check if clone, origin snapshot saved to buffer
         char buf[ZFS_MAX_DATASET_NAME_LEN];
-        if (zfs_prop_get(zh, ZFS_PROP_ORIGIN, buf, sizeof(buf), NULL, NULL, 0, 1) == 0) {
+        if (zfs_prop_get(zh, ZFS_PROP_ORIGIN, buf, ZFS_MAX_DATASET_NAME_LEN, NULL, NULL, 0, 1) == 0) {
             // Destroy origin snapshot
             origin_h = zfs_open(cbd->lzeh->lzh, buf, ZFS_TYPE_SNAPSHOT);
             if (origin_h == NULL) {
@@ -1939,7 +1939,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
 
     // Name
     if (zfs_prop_get(zhdl, ZFS_PROP_NAME, dataset,
-            sizeof(dataset), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAX_DATASET_NAME_LEN, NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed get 'name' property for %s.\n", handle_name);
         goto err;
@@ -1957,7 +1957,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     // Mountpoint
     char mounted[ZFS_MAX_DATASET_NAME_LEN];
     if (zfs_prop_get(zhdl, ZFS_PROP_MOUNTED, mounted,
-            sizeof(mounted), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAX_DATASET_NAME_LEN, NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed get 'mounted' for %s.\n", handle_name);
         goto err;
@@ -1966,7 +1966,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     int is_mounted = strcmp(mounted, "yes");
     if (is_mounted == 0) {
         if (zfs_prop_get(zhdl, ZFS_PROP_MOUNTPOINT, mountpoint,
-                sizeof(mountpoint), NULL, NULL, 0, 1) != 0) {
+                ZFS_MAX_DATASET_NAME_LEN, NULL, NULL, 0, 1) != 0) {
             ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                     "Failed get 'mountpoint' for %s.\n", handle_name);
             goto err;
@@ -1976,7 +1976,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
 
     // Creation
     if (zfs_prop_get(zhdl, ZFS_PROP_CREATION, prop_buffer,
-            sizeof(prop_buffer), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed get 'creation' for %s.\n", handle_name);
         goto err;
@@ -2111,7 +2111,7 @@ libze_error mount_boot_pool(libze_handle *lzeh, const char boot_environment[stat
     }
 
     char prop_buf[ZFS_MAXPROPLEN] = "";
-    if (zfs_prop_get(target_dataset_hndl, ZFS_PROP_MOUNTPOINT, prop_buf, sizeof(prop_buf), NULL, NULL, 0, 1) != 0) {
+    if (zfs_prop_get(target_dataset_hndl, ZFS_PROP_MOUNTPOINT, prop_buf, ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_LIBZFS,
                                "Failed to get the mountpoint for the requested boot dataset (%s).\n", target_dataset);
     }
@@ -2162,7 +2162,7 @@ mount_callback(zfs_handle_t *zh, void *data) {
 
     // Get mountpoint
     if (zfs_prop_get(zh, ZFS_PROP_MOUNTPOINT, prop_buf,
-            sizeof(prop_buf), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed to get mountpoint for %s\n.", dataset);
         return -1;
@@ -2284,7 +2284,7 @@ libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
         goto err;
     }
 
-    (void)libze_util_concat(lzeh->env_root, "/", boot_environment, sizeof(dataset_buffer), dataset_buffer);
+    (void)libze_util_concat(lzeh->env_root, "/", boot_environment, ZFS_MAX_DATASET_NAME_LEN, dataset_buffer);
     if (libze_util_temporary_mount(dataset_buffer, real_mountpoint) != LIBZE_ERROR_SUCCESS) {
         if (tmpdir_created) {
             (void) rmdir(real_mountpoint);
@@ -2403,7 +2403,7 @@ libze_rename(libze_handle *lzeh, const char boot_environment[static 1],
     // Go ahead with rename, checks passed
 
     // No recurse, no create parents
-    (void)libze_util_concat(lzeh->env_root, "/", new_boot_environment, sizeof(new_dataset_buffer),
+    (void)libze_util_concat(lzeh->env_root, "/", new_boot_environment, ZFS_MAX_DATASET_NAME_LEN,
                             new_dataset_buffer);
     if (zfs_rename(be_zh, new_dataset_buffer, B_FALSE, B_FALSE) != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
@@ -2414,7 +2414,7 @@ libze_rename(libze_handle *lzeh, const char boot_environment[static 1],
     if (be_bpool_zh != NULL) {
         // No recurse, no create parents
         (void)libze_util_concat(lzeh->bootpool.root_path_full, "", new_boot_environment, 
-                                sizeof(new_dataset_bpool_buffer), new_dataset_bpool_buffer);
+                                ZFS_MAX_DATASET_NAME_LEN, new_dataset_bpool_buffer);
         if (zfs_rename(be_bpool_zh, new_dataset_bpool_buffer, B_FALSE, B_FALSE) != 0) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                     "Rename of boot environment (%s) on bootpool failed.\n", boot_environment);
@@ -2599,7 +2599,7 @@ libze_error unmount_boot_pool(libze_handle *lzeh, const char boot_environment[st
     }
 
     char prop_buf[ZFS_MAXPROPLEN] = "";
-    if (zfs_prop_get(target_dataset_hndl, ZFS_PROP_MOUNTPOINT, prop_buf, sizeof(prop_buf), NULL, NULL, 0, 1) != 0) {
+    if (zfs_prop_get(target_dataset_hndl, ZFS_PROP_MOUNTPOINT, prop_buf, ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_LIBZFS,
                                "Failed to get the mountpoint for the requested boot dataset (%s).\n", target_dataset);
     }

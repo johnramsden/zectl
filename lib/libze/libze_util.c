@@ -139,7 +139,7 @@ libze_validate_existing_be(libze_handle *lzeh, const char be[static 1]) {
     char be_dataset_bootpool[ZFS_MAX_DATASET_NAME_LEN] = "";
 
     /* Check dataset path */
-    if (libze_util_concat(lzeh->env_root, "/", be, sizeof(be_dataset), be_dataset) 
+    if (libze_util_concat(lzeh->env_root, "/", be, ZFS_MAX_DATASET_NAME_LEN, be_dataset) 
             != LIBZE_ERROR_SUCCESS) {
         return LIBZE_ERROR_MAXPATHLEN;
     }
@@ -156,7 +156,7 @@ libze_validate_existing_be(libze_handle *lzeh, const char be[static 1]) {
 
     if (lzeh->bootpool.pool_zhdl != NULL) {
         /* Check dataset path on bootpool */
-        if (libze_util_concat(lzeh->bootpool.root_path_full, "", be, sizeof(be_dataset_bootpool), 
+        if (libze_util_concat(lzeh->bootpool.root_path_full, "", be, ZFS_MAX_DATASET_NAME_LEN, 
                 be_dataset_bootpool) != LIBZE_ERROR_SUCCESS) {
             return LIBZE_ERROR_MAXPATHLEN;
         }
@@ -192,7 +192,7 @@ libze_validate_new_be(libze_handle *lzeh, const char be[static 1]) {
     char be_dataset_bootpool[ZFS_MAX_DATASET_NAME_LEN] = "";
 
     /* Check dataset path */
-    if (libze_util_concat(lzeh->env_root, "/", be, sizeof(be_dataset), be_dataset) 
+    if (libze_util_concat(lzeh->env_root, "/", be, ZFS_MAX_DATASET_NAME_LEN, be_dataset) 
             != LIBZE_ERROR_SUCCESS) {
         return LIBZE_ERROR_MAXPATHLEN;
     }
@@ -203,7 +203,7 @@ libze_validate_new_be(libze_handle *lzeh, const char be[static 1]) {
 
     if (lzeh->bootpool.pool_zhdl != NULL) {
         /* Check dataset path on bootpool */
-        if (libze_util_concat(lzeh->bootpool.root_path_full, "", be, sizeof(be_dataset_bootpool), 
+        if (libze_util_concat(lzeh->bootpool.root_path_full, "", be, ZFS_MAX_DATASET_NAME_LEN, 
                 be_dataset_bootpool) != LIBZE_ERROR_SUCCESS) {
             return LIBZE_ERROR_MAXPATHLEN;
         }
@@ -364,11 +364,11 @@ libze_util_open_boot_environment(libze_handle* lzeh, const char be[static 1], zf
         return ret;
     }
 
-    (void)libze_util_concat(lzeh->env_root, "/", be, sizeof(be_dataset), be_dataset);
+    (void)libze_util_concat(lzeh->env_root, "/", be, ZFS_MAX_DATASET_NAME_LEN, be_dataset);
     *be_zh = zfs_open(lzeh->lzh, be_dataset, ZFS_TYPE_FILESYSTEM);
 
     if (lzeh->bootpool.pool_zhdl != NULL) {
-        (void)libze_util_concat(lzeh->bootpool.root_path_full, "", be, sizeof(be_dataset_bpool),
+        (void)libze_util_concat(lzeh->bootpool.root_path_full, "", be, ZFS_MAX_DATASET_NAME_LEN,
                                 be_dataset_bpool);
         *be_bpool_zh = zfs_open(lzeh->lzh, be_dataset_bpool, ZFS_TYPE_FILESYSTEM);
 
