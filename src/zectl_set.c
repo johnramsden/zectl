@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <sys/nvpair.h>
+#include <unistd.h>
+
 #include "zectl.h"
 
 /**

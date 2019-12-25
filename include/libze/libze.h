@@ -1,7 +1,9 @@
 #ifndef ZECTL_LIBZE_H
 #define ZECTL_LIBZE_H
 
-#include <libzfs/libzfs.h>
+#include <stddef.h>
+
+#include "libzfs/libzfs.h"
 
 #define LIBZE_MAX_ERROR_LEN    1024
 

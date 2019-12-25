@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <unistd.h>
+
+#include "libze/libze_util.h"
 #include "zectl.h"
 
 libze_error

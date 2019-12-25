@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "zectl_util.h"
 
 int

@@ -1,10 +1,12 @@
 #ifndef ZECTL_LIBZE_UTIL_H
 #define ZECTL_LIBZE_UTIL_H
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdio.h>
-#include <libze/libze.h>
+
+#include "libze/libze.h"
 
 #define COPY_BUFLEN 4096
 

@@ -3,13 +3,13 @@
 #define _LARGEFILE_SOURCE
 #define _LARGEFILE64_SOURCE
 
+#include <dirent.h>
 #include <string.h>
 #include <sys/mount.h>
-#include <libze/libze_util.h>
-#include <dirent.h>
 #include <sys/stat.h>
 
 #include "libze/libze.h"
+#include "libze/libze_util.h"
 #include "system_linux.h"
 
 /**

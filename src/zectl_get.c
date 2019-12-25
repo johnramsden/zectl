@@ -1,3 +1,8 @@
+#include <stdio.h>
+#include <string.h>
+#include <sys/nvpair.h>
+#include <unistd.h>
+
 #include "zectl.h"
 #include "zectl_util.h"
 
@@ -55,6 +60,7 @@ print_properties(libze_handle *lzeh, nvlist_t *properties, get_options *options)
 
     return LIBZE_ERROR_SUCCESS;
 }
+
 /**
  * get command main function
  * @param lzeh Initialized handle to libze object
