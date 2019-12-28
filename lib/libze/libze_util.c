@@ -13,6 +13,8 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 
+#define ASCII_OFFSET 48
+
 /**
  * @brief Concatenate two strings with a separator
  * @param[in] prefix Prefix string
@@ -517,4 +519,44 @@ libze_util_replace_string(const char *to_replace, const char *replacement, size_
 err:
     free(result_buf);
     return ret;
+}
+
+libze_error
+libze_util_regex_subexpr_replace(regex_t *re, size_t replace_buflen,
+                                 const char replace[replace_buflen], size_t input_buflen,
+                                 const char input[input_buflen], size_t output_buflen,
+                                 char output[output_buflen]) {
+    char *pos;
+    int so;
+    int n;
+
+    if (strlcpy(output, replace, replace_buflen) >= output_buflen) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+
+    regmatch_t pmatch[LIBZE_UTIL_MAX_REGEX_GROUPS];
+    if (regexec(re, input, LIBZE_UTIL_MAX_REGEX_GROUPS, pmatch, 0) == REG_NOMATCH) {
+        return LIBZE_ERROR_SUCCESS;
+    }
+
+    /* Replace subexpression */
+    for (pos = output; *pos != 0; pos++) {
+        if (*pos != '\\') {
+            continue;
+        }
+        char next_char = *(pos + 1);
+        if (next_char > '0' && next_char <= '9') {
+            int match_index = next_char - ASCII_OFFSET;
+            so = pmatch[match_index].rm_so;
+            n = pmatch[match_index].rm_eo - so;
+            if (so < 0 || strlen(output) + n - 1 > output_buflen) {
+                return LIBZE_ERROR_UNKNOWN;
+            }
+            memmove(pos + n, pos + 2, strlen(pos) - 1);
+            memmove(pos, input + so, n);
+            pos = pos + n - 2;
+        }
+    }
+
+    return LIBZE_ERROR_SUCCESS;
 }

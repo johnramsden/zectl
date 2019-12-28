@@ -402,6 +402,178 @@ err:
     return ret;
 }
 
+static libze_error
+form_title_regex(regex_t *re, const char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
+
+    char reg_buf[REGEX_BUFLEN];
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    ret = libze_util_concat("\\(title.*\\)\\(", be_name, "\\)\\(.*\\)", REGEX_BUFLEN, reg_buf);
+
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    if (regcomp(re, reg_buf, 0) != 0) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
+    return ret;
+}
+
+static libze_error
+form_linux_regex(regex_t *re, const char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
+
+    char reg_buf[REGEX_BUFLEN];
+
+    char be_no_dots[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char ns_no_dots[ZFS_MAX_DATASET_NAME_LEN] = "";
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    int iret = 0;
+
+    ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, be_name,
+                                    ZFS_MAX_DATASET_NAME_LEN, be_no_dots);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, ZE_PROP_NAMESPACE,
+                                    ZFS_MAX_DATASET_NAME_LEN, ns_no_dots);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    iret = snprintf(reg_buf, REGEX_BUFLEN, "\\(linux\\|initrd\\)\\(.*\\)\\(%s-\\)\\(%s\\)\\(/.*\\)",
+                    ns_no_dots, be_no_dots);
+
+    if (iret >= REGEX_BUFLEN) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+
+    if (regcomp(re, reg_buf, 0) != 0) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+static libze_error
+form_dataset_regex(regex_t *re, const char be_root[LIBZE_MAX_PATH_LEN],
+                   const char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
+
+    char reg_buf[REGEX_BUFLEN];
+
+    char be_no_dots[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_root_no_dots[ZFS_MAX_DATASET_NAME_LEN] = "";
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    int iret = 0;
+
+    ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, be_name,
+                                    ZFS_MAX_DATASET_NAME_LEN, be_no_dots);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, be_root,
+                                    ZFS_MAX_DATASET_NAME_LEN, be_root_no_dots);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    iret = snprintf(reg_buf, REGEX_BUFLEN, "\\(options.*zfs=%s/\\)\\(%s\\)\\(.*\\)",
+                    be_root_no_dots, be_no_dots);
+
+    if (iret >= REGEX_BUFLEN) {
+        return LIBZE_ERROR_MAXPATHLEN;
+    }
+
+    if (regcomp(re, reg_buf, 0) != 0) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
+    return LIBZE_ERROR_SUCCESS;
+}
+
+static libze_error
+get_line_from_regex(libze_handle *lzeh, const char be_name_active[LIBZE_MAX_PATH_LEN],
+                    const char be_name[LIBZE_MAX_PATH_LEN], const char line[LIBZE_MAX_PATH_LEN],
+                    char replace_line_buf[LIBZE_MAX_PATH_LEN]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    regmatch_t pmatch;
+
+    regex_t re_title_buf, re_linux_buf, re_dataset_buf;
+    regex_t *re_title_p = NULL, *re_linux_p = NULL, *re_dataset_p = NULL;
+
+    ret = form_linux_regex(&re_linux_buf, be_name_active);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        goto done;
+    }
+    re_linux_p = &re_linux_buf;
+
+    ret = form_title_regex(&re_title_buf, be_name_active);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        goto done;
+    }
+    re_title_p = &re_title_buf;
+
+    ret = form_dataset_regex(&re_dataset_buf, lzeh->env_root, be_name_active);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        goto done;
+    }
+    re_dataset_p = &re_dataset_buf;
+
+    char replace_two[LIBZE_MAX_PATH_LEN] = "";
+    char replace_four[LIBZE_MAX_PATH_LEN] = "";
+
+    ret = libze_util_concat("\\1", be_name, "\\3", LIBZE_MAX_PATH_LEN, replace_two);
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        ret = libze_util_concat("\\1\\2\\3", be_name, "\\5", LIBZE_MAX_PATH_LEN, replace_four);
+    }
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        goto done;
+    }
+
+    if (regexec(re_title_p, line, 0, &pmatch, 0) == 0) {
+        ret = libze_util_regex_subexpr_replace(re_title_p, LIBZE_MAX_PATH_LEN, replace_two,
+                                               LIBZE_MAX_PATH_LEN, line, LIBZE_MAX_PATH_LEN,
+                                               replace_line_buf);
+        goto done;
+    }
+
+    if (regexec(re_linux_p, line, 0, &pmatch, 0) == 0) {
+        ret = libze_util_regex_subexpr_replace(re_linux_p, LIBZE_MAX_PATH_LEN, replace_four,
+                                               LIBZE_MAX_PATH_LEN, line, LIBZE_MAX_PATH_LEN,
+                                               replace_line_buf);
+        goto done;
+    }
+
+    if (regexec(re_dataset_p, line, 0, &pmatch, 0) == 0) {
+        ret = libze_util_regex_subexpr_replace(re_dataset_p, LIBZE_MAX_PATH_LEN, replace_two,
+                                               LIBZE_MAX_PATH_LEN, line, LIBZE_MAX_PATH_LEN,
+                                               replace_line_buf);
+        goto done;
+    }
+
+    if (strlcpy(replace_line_buf, line, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        ret = LIBZE_ERROR_MAXPATHLEN;
+    }
+
+done:
+    if (re_title_p != NULL) {
+        regfree(re_title_p);
+    }
+    if (re_linux_p != NULL) {
+        regfree(re_linux_p);
+    }
+    if (re_dataset_p != NULL) {
+        regfree(re_dataset_p);
+    }
+
+    return ret;
+}
+
 /**
  * @brief TODO
  * @param lzeh
@@ -430,11 +602,9 @@ replace_matched(libze_handle *lzeh, const char filename[LIBZE_MAX_PATH_LEN],
     }
 
     char line_buf[LIBZE_MAX_PATH_LEN];
-    char replace_line_buf[LIBZE_MAX_PATH_LEN];
+    char replace_line_buf[LIBZE_MAX_PATH_LEN] = "";
     while (fgets(line_buf, LIBZE_MAX_PATH_LEN, file)) {
-        /* TODO: Rewrite to be 'selective' and match each line based on regex */
-        ret = libze_util_replace_string(be_name_active, be_name, LIBZE_MAX_PATH_LEN, line_buf,
-                                        LIBZE_MAX_PATH_LEN, replace_line_buf);
+        ret = get_line_from_regex(lzeh, be_name_active, be_name, line_buf, replace_line_buf);
         if (ret != LIBZE_ERROR_SUCCESS) {
             goto err;
         }

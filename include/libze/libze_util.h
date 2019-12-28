@@ -8,6 +8,7 @@
 #include <string.h>
 
 #define COPY_BUFLEN 4096
+#define LIBZE_UTIL_MAX_REGEX_GROUPS 10
 
 #if defined(DEBUG) && DEBUG > 0
 #    define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -66,5 +67,11 @@ libze_error
 libze_util_replace_string(const char *to_replace, const char *replacement, size_t line_length,
                           const char line[line_length], size_t line_replaced_length,
                           char line_replaced[line_replaced_length]);
+
+libze_error
+libze_util_regex_subexpr_replace(regex_t *re, size_t replace_buflen,
+                                 const char replace[replace_buflen], size_t input_buflen,
+                                 const char input[input_buflen], size_t output_buflen,
+                                 char output[output_buflen]);
 
 #endif // ZECTL_LIBZE_UTIL_H
