@@ -166,7 +166,15 @@ main(int argc, char *argv[]) {
         (void) libze_error_clear(lzeh);
     }
 
+    /* Initialize the root structure of a separate bootpool if available */
     if (libze_boot_pool_set(lzeh) != LIBZE_ERROR_SUCCESS) {
+        fputs(lzeh->libze_error_message, stderr);
+        ret = EXIT_FAILURE;
+        goto fin;
+    }
+
+    /* Validate the running and activated boot environment */
+    if (libze_validate_system(lzeh) != LIBZE_ERROR_SUCCESS) {
         fputs(lzeh->libze_error_message, stderr);
         ret = EXIT_FAILURE;
         goto fin;

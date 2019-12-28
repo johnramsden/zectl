@@ -18,6 +18,7 @@ typedef enum libze_error {
     LIBZE_ERROR_ZFS_OPEN,
     LIBZE_ERROR_UNKNOWN,
     LIBZE_ERROR_EPERM,
+    LIBZE_ERROR_MOUNTPOINT,
     LIBZE_ERROR_NOMEM,
     LIBZE_ERROR_EEXIST,         /* Dataset/fs/snapshot doesn't exist */
     LIBZE_ERROR_MAXPATHLEN,     /* Dataset/fs/snapshot exceeds LIBZE_MAXPATHLEN */
@@ -43,10 +44,6 @@ typedef struct libze_bootpool {
     char root_path_full[ZFS_MAX_DATASET_NAME_LEN];     /**< Dataset root path with prefix (e.g. "bpool/boot/env/ze-" or
                                                             "bpool/boot/env/" if no prefix is set) */
     char dataset_prefix[ZFS_MAX_DATASET_NAME_LEN];     /**< Dataset prefix (e.g. "ze" for "ROOT_PATH/ze-ENV") */
-    char env_activated_path[ZFS_MAX_DATASET_NAME_LEN]; /**< Path to the boot dataset of the currently activated boot
-                                                            environment */
-    char env_running_path[ZFS_MAX_DATASET_NAME_LEN];   /**< Path to the boot dataset of the currently running boot
-                                                            environment   */
 } libze_bootpool;
 
 /**
@@ -97,6 +94,9 @@ libze_fini(libze_handle *lzeh);
 
 libze_error
 libze_boot_pool_set(libze_handle *lzeh);
+
+libze_error
+libze_validate_system(libze_handle *lzeh);
 
 libze_error
 libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suffix[static 1], char be[static 1],
