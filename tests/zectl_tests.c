@@ -2,22 +2,23 @@
 // Created by john on 1/2/19.
 //
 
+#include "zectl_tests.h"
+
+#include "libze/libze.h"
+
 #include <check.h>
 #include <stdio.h>
 
-#include "libze/libze.h"
-#include "zectl_tests.h"
+START_TEST(test_libze_init) {
+    libze_handle *lzeh = NULL;
+    lzeh = libze_init();
 
-START_TEST (test_libze_init)
-    {
-        libze_handle *lzeh = NULL;
-        lzeh = libze_init();
-
-        fail_if(!lzeh, "lzeh null after allocation");
-    }
+    fail_if(!lzeh, "lzeh null after allocation");
+}
 END_TEST
 
-Suite* zectl_suite(void) {
+Suite *
+zectl_suite(void) {
     Suite *suite = suite_create("zectl");
     TCase *tcase = tcase_create("case");
     tcase_add_test(tcase, test_libze_init);
@@ -25,7 +26,8 @@ Suite* zectl_suite(void) {
     return suite;
 }
 
-int main (int argc, char *argv[]) {
+int
+main(int argc, char *argv[]) {
     int number_failed;
     Suite *suite = zectl_suite();
     SRunner *runner = srunner_create(suite);

@@ -1,10 +1,11 @@
 // Make sure libspl mnttab.h isn't imported, creates getmnttent conflict
 #define _SYS_MNTTAB_H
 
-#include <mntent.h>
+#include "system_linux.h"
 
 #include "libze/libze_util.h"
-#include "system_linux.h"
+
+#include <mntent.h>
 
 /**
  * @brief Given a mountpoint get the dataset mounted
@@ -33,7 +34,6 @@ libze_dataset_from_mountpoint(char mountpoint[static 1], size_t buflen, char dat
     do { /* Loop until mountpoint found or EOF */
         ent = getmntent(mnt_file);
     } while (ent != NULL && (strcmp(ent->mnt_dir, mountpoint) != 0));
-
 
     if (ent == NULL) {
         ret = SYSTEM_ERR_NOT_FOUND;

@@ -1,17 +1,17 @@
+#include "libze/libze_util.h"
+#include "zectl.h"
+#include "zectl_util.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/nvpair.h>
 #include <unistd.h>
 
-#include "libze/libze_util.h"
-#include "zectl.h"
-#include "zectl_util.h"
-
-#define HEADER_NAME       "Name"
-#define HEADER_ACTIVE     "Active"
+#define HEADER_NAME "Name"
+#define HEADER_ACTIVE "Active"
 #define HEADER_MOUNTPOINT "Mountpoint"
-#define HEADER_SPACEUSED  "Space"
-#define HEADER_CREATION   "Creation"
+#define HEADER_SPACEUSED "Space"
+#define HEADER_CREATION "Creation"
 
 typedef struct list_value_widths {
     size_t name;
@@ -56,7 +56,6 @@ compute_column_widths(nvlist_t *be_props, list_options_t *options, list_value_wi
         widths->active = active_width;
     }
 
-
     // TODO: ??
 
     return 0;
@@ -88,10 +87,10 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
         widths.mountpoint += HEADER_SPACING;
         widths.spaceused += HEADER_SPACING;
         widths.creation += HEADER_SPACING;
-        printf("%-*s", (int)widths.name, HEADER_NAME);
-        printf("%-*s", (int)widths.active, HEADER_ACTIVE);
-        printf("%-*s", (int)widths.mountpoint, HEADER_MOUNTPOINT);
-        printf("%-*s", (int)widths.creation, HEADER_CREATION);
+        printf("%-*s", (int) widths.name, HEADER_NAME);
+        printf("%-*s", (int) widths.active, HEADER_ACTIVE);
+        printf("%-*s", (int) widths.mountpoint, HEADER_MOUNTPOINT);
+        printf("%-*s", (int) widths.creation, HEADER_CREATION);
         fputs("\n", stdout);
     }
 
@@ -102,7 +101,7 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
         if (nvlist_lookup_string(be_props, "name", &string_prop) == 0) {
             char buf[ZFS_MAX_DATASET_NAME_LEN];
             libze_boot_env_name(string_prop, ZFS_MAX_DATASET_NAME_LEN, buf);
-            printf("%-*s%s", (int)widths.name, buf, tab_suffix);
+            printf("%-*s%s", (int) widths.name, buf, tab_suffix);
         }
 
         char active_buff[3] = "";
@@ -118,14 +117,14 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
                 strcat(active_buff, "R");
             }
         }
-        printf("%-*s%s", (int)widths.active, active_buff, tab_suffix);
+        printf("%-*s%s", (int) widths.active, active_buff, tab_suffix);
 
         if (nvlist_lookup_string(be_props, "mountpoint", &string_prop) == 0) {
-            printf("%-*s%s", (int)widths.creation, string_prop, tab_suffix);
+            printf("%-*s%s", (int) widths.creation, string_prop, tab_suffix);
         }
 
         if (nvlist_lookup_string(be_props, "creation", &string_prop) == 0) {
-            printf("%-*s%s", (int)widths.creation, string_prop, tab_suffix);
+            printf("%-*s%s", (int) widths.creation, string_prop, tab_suffix);
         }
 
         fputs("\n", stdout);
@@ -144,18 +143,18 @@ ze_list(libze_handle *lzeh, int argc, char **argv) {
     // TODO: aDs
     while ((opt = getopt(argc, argv, "H")) != -1) {
         switch (opt) {
-//            case 'a':
-//                options.all = B_TRUE;
-//                break;
+                //            case 'a':
+                //                options.all = B_TRUE;
+                //                break;
             case 'D':
                 options.spaceused = B_TRUE;
                 break;
             case 'H':
                 options.tab_delimited = B_TRUE;
                 break;
-//            case 's':
-//                options.snapshots = B_TRUE;
-//                break;
+                //            case 's':
+                //                options.snapshots = B_TRUE;
+                //                break;
             default:
                 fprintf(stderr, "%s list: unknown option '-%c'\n", ZE_PROGRAM, optopt);
                 ze_usage();

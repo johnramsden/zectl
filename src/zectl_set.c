@@ -1,8 +1,8 @@
+#include "zectl.h"
+
 #include <stdio.h>
 #include <sys/nvpair.h>
 #include <unistd.h>
-
-#include "zectl.h"
 
 /**
  * set command main function
@@ -41,7 +41,7 @@ ze_set(libze_handle *lzeh, int argc, char **argv) {
     }
 
     ret = libze_set(lzeh, properties);
-    
+
 err:
     fnvlist_free(properties);
     return ret;

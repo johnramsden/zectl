@@ -1,8 +1,8 @@
+#include "zectl.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "zectl.h"
 
 /**
  * create command main function
@@ -16,10 +16,7 @@ ze_create(libze_handle *lzeh, int argc, char **argv) {
 
     libze_bootloader bootloader;
 
-    libze_create_options be_clone = {
-            .existing = B_FALSE,
-            .recursive = B_FALSE
-    };
+    libze_create_options be_clone = {.existing = B_FALSE, .recursive = B_FALSE};
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
     bootloader.set = B_FALSE;
@@ -58,12 +55,14 @@ ze_create(libze_handle *lzeh, int argc, char **argv) {
         return LIBZE_ERROR_MAXPATHLEN;
     }
 
-    if ((ret = libze_bootloader_init(lzeh, &bootloader, ZE_PROP_NAMESPACE)) != LIBZE_ERROR_SUCCESS) {
+    if ((ret = libze_bootloader_init(lzeh, &bootloader, ZE_PROP_NAMESPACE)) !=
+        LIBZE_ERROR_SUCCESS) {
         goto err;
     }
 
     if (be_clone.existing) {
-        if (strlcpy(be_clone.be_source, be_existing, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+        if (strlcpy(be_clone.be_source, be_existing, ZFS_MAX_DATASET_NAME_LEN) >=
+            ZFS_MAX_DATASET_NAME_LEN) {
             fprintf(stderr, "Existing boot environment source exceeds max dataset length.\n");
             return LIBZE_ERROR_MAXPATHLEN;
         }

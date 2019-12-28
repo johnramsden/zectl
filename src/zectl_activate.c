@@ -1,17 +1,14 @@
-#include <stdio.h>
-#include <unistd.h>
-
 #include "libze/libze_util.h"
 #include "zectl.h"
+
+#include <stdio.h>
+#include <unistd.h>
 
 libze_error
 ze_activate(libze_handle *lzeh, int argc, char **argv) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
     int opt;
-    libze_activate_options options = {
-            .be_name = NULL,
-            .noconfirm = B_FALSE
-    };
+    libze_activate_options options = {.be_name = NULL, .noconfirm = B_FALSE};
 
     opterr = 0;
 
@@ -39,10 +36,10 @@ ze_activate(libze_handle *lzeh, int argc, char **argv) {
     options.be_name = argv[0];
 
     char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if (libze_util_concat(lzeh->env_root, "/",
-            options.be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != LIBZE_ERROR_SUCCESS) {
-        fprintf(stderr, "Requested boot environment %s exceeds max length %d\n",
-                options.be_name, ZFS_MAX_DATASET_NAME_LEN);
+    if (libze_util_concat(lzeh->env_root, "/", options.be_name, ZFS_MAX_DATASET_NAME_LEN,
+                          be_ds_buff) != LIBZE_ERROR_SUCCESS) {
+        fprintf(stderr, "Requested boot environment %s exceeds max length %d\n", options.be_name,
+                ZFS_MAX_DATASET_NAME_LEN);
         return LIBZE_ERROR_MAXPATHLEN;
     }
 

@@ -1,8 +1,8 @@
+#include "zectl.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "zectl.h"
 
 libze_error
 ze_rename(libze_handle *lzeh, int argc, char **argv) {

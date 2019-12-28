@@ -1,17 +1,13 @@
+#include "zectl.h"
+
 #include <stdio.h>
 #include <unistd.h>
-
-#include "zectl.h"
 
 libze_error
 ze_destroy(libze_handle *lzeh, int argc, char **argv) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
     int opt;
-    libze_destroy_options options = {
-            .be_name = NULL,
-            .force = B_FALSE,
-            .destroy_origin = B_TRUE
-    };
+    libze_destroy_options options = {.be_name = NULL, .force = B_FALSE, .destroy_origin = B_TRUE};
 
     opterr = 0;
 

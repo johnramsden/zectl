@@ -3,14 +3,15 @@
 #define _LARGEFILE_SOURCE
 #define _LARGEFILE64_SOURCE
 
+#include "libze/libze_util.h"
+
+#include "libze/libze.h"
+#include "system_linux.h"
+
 #include <dirent.h>
 #include <string.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
-
-#include "libze/libze.h"
-#include "libze/libze_util.h"
-#include "system_linux.h"
 
 /**
  * @brief Concatenate two strings with a separator
@@ -22,13 +23,12 @@
  * @return Nonzero if the resulting string is longer than the buffer length
  */
 int
-libze_util_concat(const char *prefix, const char *separator, const char *suffix,
-                  size_t buflen, char buf[buflen]) {
+libze_util_concat(const char *prefix, const char *separator, const char *suffix, size_t buflen,
+                  char buf[buflen]) {
 
     (void) strlcpy(buf, "", buflen);
 
-    if ((strlcat(buf, prefix, buflen) >= buflen) ||
-        (strlcat(buf, separator, buflen) >= buflen) ||
+    if ((strlcat(buf, prefix, buflen) >= buflen) || (strlcat(buf, separator, buflen) >= buflen) ||
         (strlcat(buf, suffix, buflen) >= buflen)) {
         return -1;
     }
@@ -72,20 +72,20 @@ libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char 
  *         or if the length of the buffer is exceeded
  */
 int
-libze_util_suffix_after_string(const char root[static 1], const char dataset[static 1], size_t buflen,
-                               char buf[buflen]) {
+libze_util_suffix_after_string(const char root[static 1], const char dataset[static 1],
+                               size_t buflen, char buf[buflen]) {
 
     if (strlcpy(buf, dataset, buflen) >= buflen) {
         return -1;
     }
 
-    size_t loc = strlen(root)+1;
+    size_t loc = strlen(root) + 1;
     if (loc >= buflen) {
         return -1;
     }
 
     /* get substring after next '/' */
-    if (strlcpy(buf, buf+loc, buflen) >= buflen) {
+    if (strlcpy(buf, buf + loc, buflen) >= buflen) {
         return -1;
     }
 
@@ -114,7 +114,7 @@ libze_boot_env_name(const char *dataset, size_t buflen, char buf[buflen]) {
     }
 
     /* get substring after last '/' */
-    if (strlcpy(buf, slashp+1, buflen) >= buflen) {
+    if (strlcpy(buf, slashp + 1, buflen) >= buflen) {
         return -1;
     }
 
@@ -131,8 +131,7 @@ boolean_t
 libze_is_active_be(libze_handle *lzeh, const char be[static 1]) {
     if (strchr(be, '/') == NULL) {
         return ((strcmp(lzeh->env_activated, be) == 0) ? B_TRUE : B_FALSE);
-    }
-    else {
+    } else {
         return ((strcmp(lzeh->env_activated_path, be) == 0) ? B_TRUE : B_FALSE);
     }
 }
@@ -147,8 +146,7 @@ boolean_t
 libze_is_root_be(libze_handle *lzeh, const char be[static 1]) {
     if (strchr(be, '/') == NULL) {
         return ((strcmp(lzeh->env_running, be) == 0) ? B_TRUE : B_FALSE);
-    }
-    else {
+    } else {
         return ((strcmp(lzeh->env_running_path, be) == 0) ? B_TRUE : B_FALSE);
     }
 }
@@ -164,8 +162,7 @@ libze_list_free(nvlist_t *nvl) {
     }
 
     nvpair_t *pair = NULL;
-    for (pair = nvlist_next_nvpair(nvl, NULL); pair != NULL;
-         pair = nvlist_next_nvpair(nvl, pair)) {
+    for (pair = nvlist_next_nvpair(nvl, NULL); pair != NULL; pair = nvlist_next_nvpair(nvl, pair)) {
         nvlist_t *ds_props = NULL;
         nvpair_value_nvlist(pair, &ds_props);
         fnvlist_free(ds_props);
@@ -189,7 +186,8 @@ libze_get_root_dataset(libze_handle *lzeh) {
     char rootfs[ZFS_MAX_DATASET_NAME_LEN];
 
     // Make sure type is ZFS
-    if (libze_dataset_from_mountpoint("/", ZFS_MAX_DATASET_NAME_LEN, rootfs) != SYSTEM_ERR_SUCCESS) {
+    if (libze_dataset_from_mountpoint("/", ZFS_MAX_DATASET_NAME_LEN, rootfs) !=
+        SYSTEM_ERR_SUCCESS) {
         return -1;
     }
 
@@ -197,11 +195,12 @@ libze_get_root_dataset(libze_handle *lzeh) {
         return -1;
     }
 
-    if (strlcpy(lzeh->env_running_path, zfs_get_name(zh), ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+    if (strlcpy(lzeh->env_running_path, zfs_get_name(zh), ZFS_MAX_DATASET_NAME_LEN) >=
+        ZFS_MAX_DATASET_NAME_LEN) {
         strlcpy(lzeh->env_running_path, "", ZFS_MAX_DATASET_NAME_LEN);
         ret = -1;
-    }
-    else if (libze_boot_env_name(lzeh->env_running_path, ZFS_MAX_DATASET_NAME_LEN, lzeh->env_running) != 0) {
+    } else if (libze_boot_env_name(lzeh->env_running_path, ZFS_MAX_DATASET_NAME_LEN,
+                                   lzeh->env_running) != 0) {
         ret = -1;
         strlcpy(lzeh->env_running, "", ZFS_MAX_DATASET_NAME_LEN);
         strlcpy(lzeh->env_running_path, "", ZFS_MAX_DATASET_NAME_LEN);
@@ -225,7 +224,7 @@ libze_get_zpool_name_from_dataset(const char dataset[static 3], size_t buflen, c
         }
         for (size_t i = 1; i < buflen; ++i) {
             if (dataset[i] == '/') {
-                (void)strlcpy(buf, dataset, i+1);
+                (void) strlcpy(buf, dataset, i + 1);
                 buf[i] = '\0';
                 return 0;
             }
@@ -235,7 +234,8 @@ libze_get_zpool_name_from_dataset(const char dataset[static 3], size_t buflen, c
 }
 
 libze_error
-libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN], const char mountpoint[static 2]) {
+libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN],
+                           const char mountpoint[static 2]) {
     const char *mount_settings = "zfsutil";
     const char *mount_type = "zfs";
     const unsigned long mount_flags = 0;
@@ -254,17 +254,16 @@ libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN], const c
  * @return 0 on success else appropriate error as returned by errno
  */
 static int
-libze_util_copy_filepointer(FILE *file, FILE *new_file)
-{
+libze_util_copy_filepointer(FILE *file, FILE *new_file) {
     assert(file != NULL);
     assert(new_file != NULL);
 
     errno = 0;
     char buf[COPY_BUFLEN];
 
-    while(B_TRUE) {
+    while (B_TRUE) {
         size_t r = fread(buf, 1, COPY_BUFLEN, file);
-        if(r != COPY_BUFLEN) {
+        if (r != COPY_BUFLEN) {
             if (ferror(file) != 0) {
                 return errno;
             }
@@ -288,8 +287,7 @@ libze_util_copy_filepointer(FILE *file, FILE *new_file)
  * @return 0 on success else appropriate error as returned by errno
  */
 int
-libze_util_copy_file(const char *filename, const char *new_filename)
-{
+libze_util_copy_file(const char *filename, const char *new_filename) {
     FILE *file = NULL;
     FILE *new_file = NULL;
 
@@ -352,7 +350,7 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
             return errno;
         }
 
-        if(!S_ISDIR(st.st_mode)) {
+        if (!S_ISDIR(st.st_mode)) {
             return ENOTDIR;
         }
     }
@@ -375,7 +373,7 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
     fin += strlen(directory_path);
     new_fin += strlen(new_directory_path);
 
-    while((de = readdir(directory)) != NULL) {
+    while ((de = readdir(directory)) != NULL) {
 
         char buf[LIBZE_MAX_PATH_LEN];
 
@@ -394,7 +392,7 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
             return errno;
         }
 
-        if(S_ISDIR(st.st_mode)) {
+        if (S_ISDIR(st.st_mode)) {
             if ((strcmp(fin, "/.") == 0) || (strcmp(fin, "/..") == 0)) {
                 /* Skip entering "." or ".." */
                 continue;
@@ -406,7 +404,7 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
             }
         }
 
-        if(S_ISREG(st.st_mode)) {
+        if (S_ISREG(st.st_mode)) {
             /* path is file, copy */
             if ((ret = libze_util_copy_file(path, new_path) != 0)) {
                 return ret;
@@ -432,10 +430,8 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
  *         @p LIBZE_ERROR_NOMEM
  */
 libze_error
-libze_util_replace_string(const char *to_replace, const char *replacement,
-                          size_t line_length,
-                          const char line[line_length],
-                          size_t line_replaced_length,
+libze_util_replace_string(const char *to_replace, const char *replacement, size_t line_length,
+                          const char line[line_length], size_t line_replaced_length,
                           char line_replaced[line_replaced_length]) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
@@ -493,7 +489,8 @@ libze_util_replace_string(const char *to_replace, const char *replacement,
         len_between_replacements = insert_location - tmp_line_loc;
 
         /* Copy len_between_replacements to result_end */
-        result_end = strncpy(result_end, tmp_line_loc, len_between_replacements) + len_between_replacements;
+        result_end =
+            strncpy(result_end, tmp_line_loc, len_between_replacements) + len_between_replacements;
 
         buf_left = buf_size - (result_end - result_buf);
         if (strlcpy(result_end, replacement, buf_left) >= buf_left) {

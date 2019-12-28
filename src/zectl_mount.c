@@ -1,7 +1,7 @@
+#include "zectl.h"
+
 #include <stdio.h>
 #include <unistd.h>
-
-#include "zectl.h"
 
 libze_error
 ze_mount(libze_handle *lzeh, int argc, char **argv) {
@@ -22,7 +22,7 @@ ze_mount(libze_handle *lzeh, int argc, char **argv) {
     argc -= optind;
     argv += optind;
 
-    if ((argc < 1) || (argc > 2)){
+    if ((argc < 1) || (argc > 2)) {
         fprintf(stderr, "%s mount: wrong number of arguments\n", ZE_PROGRAM);
         ze_usage();
         return LIBZE_ERROR_UNKNOWN;
@@ -37,7 +37,8 @@ ze_mount(libze_handle *lzeh, int argc, char **argv) {
 
     const char *boot_environment = argv[0];
     char mountpoint_buffer[LIBZE_MAX_PATH_LEN];
-    if ((ret = libze_mount(lzeh, boot_environment, mountpoint, mountpoint_buffer)) == LIBZE_ERROR_SUCCESS) {
+    if ((ret = libze_mount(lzeh, boot_environment, mountpoint, mountpoint_buffer)) ==
+        LIBZE_ERROR_SUCCESS) {
         puts(mountpoint_buffer);
     }
 

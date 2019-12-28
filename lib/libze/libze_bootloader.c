@@ -13,7 +13,8 @@
  * @pre (ze_namespace != NULL) && (strlen(ze_namespace) >= 1)
  */
 libze_error
-libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader, const char ze_namespace[static 1]) {
+libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader,
+                      const char ze_namespace[static 1]) {
     nvlist_t *out_props = NULL;
     if (libze_be_props_get(lzeh, &out_props, ze_namespace) != LIBZE_ERROR_SUCCESS) {
         return LIBZE_ERROR_UNKNOWN;

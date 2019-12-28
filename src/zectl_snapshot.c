@@ -1,7 +1,7 @@
+#include "zectl.h"
+
 #include <stdio.h>
 #include <unistd.h>
-
-#include "zectl.h"
 
 libze_error
 ze_snapshot(libze_handle *lzeh, int argc, char **argv) {

@@ -4,7 +4,7 @@
 #include "libze/libze.h"
 #include "libze/libze_plugin_manager.h"
 
-#define HEADER_SPACING   2
+#define HEADER_SPACING 2
 
 extern const char *ZE_PROGRAM;
 
@@ -41,4 +41,4 @@ ze_snapshot(libze_handle *lzeh, int argc, char **argv);
 libze_error
 ze_unmount(libze_handle *lzeh, int argc, char **argv);
 
-#endif //ZECTL_ZECTL_H
+#endif // ZECTL_ZECTL_H

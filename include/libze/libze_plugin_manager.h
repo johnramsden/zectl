@@ -8,7 +8,8 @@ typedef enum libze_plugin_manager_error {
     LIBZE_PLUGIN_MANAGER_ERROR_UNKNOWN,
     LIBZE_PLUGIN_MANAGER_ERROR_EEXIST,
     LIBZE_PLUGIN_MANAGER_ERROR_MAXPATHLEN,
-    LIBZE_PLUGIN_MANAGER_ERROR_PDIR_EEXIST,  /**< Plugin directory @p PLUGINS_DIRECTORY doesn't exist */
+    /**< Plugin directory @p PLUGINS_DIRECTORY doesn't exist */
+    LIBZE_PLUGIN_MANAGER_ERROR_PDIR_EEXIST,
 } libze_plugin_manager_error;
 
 typedef struct libze_activate_data {
@@ -17,10 +18,17 @@ typedef struct libze_activate_data {
 } libze_activate_data;
 
 typedef libze_error (*plugin_fn_init)(libze_handle *lzeh);
+
 typedef libze_error (*plugin_fn_pre_activate)(libze_handle *lzeh);
-typedef libze_error (*plugin_fn_mid_activate)(libze_handle *lzeh, libze_activate_data *activate_data);
-typedef libze_error (*plugin_fn_post_activate)(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]);
-typedef libze_error (*plugin_fn_post_destroy)(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]);
+
+typedef libze_error (*plugin_fn_mid_activate)(libze_handle *lzeh,
+                                              libze_activate_data *activate_data);
+
+typedef libze_error (*plugin_fn_post_activate)(libze_handle *lzeh,
+                                               const char be_name[LIBZE_MAX_PATH_LEN]);
+
+typedef libze_error (*plugin_fn_post_destroy)(libze_handle *lzeh,
+                                              const char be_name[LIBZE_MAX_PATH_LEN]);
 
 typedef struct libze_plugin_fn_export {
     plugin_fn_init plugin_init;
@@ -44,6 +52,6 @@ libze_plugin_form_namespace(const char plugin_name[static 1], char buf[ZFS_MAXPR
 
 libze_plugin_manager_error
 libze_plugin_form_property(const char plugin_name[static 1], const char plugin_suffix[static 1],
-        char buf[ZFS_MAXPROPLEN]);
+                           char buf[ZFS_MAXPROPLEN]);
 
-#endif //ZECTL_LIBZE_PLUGIN_MANAGER_H
+#endif // ZECTL_LIBZE_PLUGIN_MANAGER_H

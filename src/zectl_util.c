@@ -1,6 +1,6 @@
-#include <string.h>
-
 #include "zectl_util.h"
+
+#include <string.h>
 
 int
 set_column_width(size_t *width_column, const char *string_prop) {

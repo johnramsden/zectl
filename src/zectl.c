@@ -7,12 +7,13 @@
  * Code for commandline application 'zectl'
  */
 
-#include <stdio.h>
-#include <string.h>
-
 #include "zectl.h"
+
 #include "libze/libze.h"
 #include "libze/libze_util.h"
+
+#include <stdio.h>
+#include <string.h>
 
 const char *ZE_PROGRAM = "zectl";
 
@@ -41,8 +42,8 @@ ze_usage(void) {
     printf("%s unmount <boot environment>\n", ZE_PROGRAM);
 }
 
-//libze_error
-//ze_get_props(libze_handle *lzeh, nvlist_t *props, nvlist_t **out_props) {
+// libze_error
+// ze_get_props(libze_handle *lzeh, nvlist_t *props, nvlist_t **out_props) {
 //    if (!props) {
 //        return LIBZE_ERROR_UNKNOWN;
 //    }
@@ -54,8 +55,7 @@ ze_usage(void) {
  * Return a function pointer to the requested command or NULL if no match
  */
 static command_func
-get_command(command_map_t *ze_command_map,
-            int num_command_options, char input_name[static 1]) {
+get_command(command_map_t *ze_command_map, int num_command_options, char input_name[static 1]) {
     command_func command = NULL;
 
     for (int i = 0; i < num_command_options; i++) {
@@ -97,7 +97,7 @@ define_default_props(libze_handle *lzeh) {
 int
 main(int argc, char *argv[]) {
 
-    int ze_argc = argc-1;
+    int ze_argc = argc - 1;
     char *ze_argv[ze_argc];
 
     int ret = EXIT_SUCCESS;
@@ -106,18 +106,10 @@ main(int argc, char *argv[]) {
 
     /* Set up all commands */
     command_map_t ze_command_map[NUM_COMMANDS] = {
-            /* If commands are added or removed, must modify 'NUM_COMMANDS' */
-            {"activate", ze_activate},
-            {"create", ze_create},
-            {"destroy", ze_destroy},
-            {"get", ze_get},
-            {"list",   ze_list},
-            {"mount", ze_mount},
-            {"rename", ze_rename},
-            {"set", ze_set},
-            {"snapshot", ze_snapshot},
-            {"unmount", ze_unmount}
-    };
+        /* If commands are added or removed, must modify 'NUM_COMMANDS' */
+        {"activate", ze_activate}, {"create", ze_create},  {"destroy", ze_destroy}, {"get", ze_get},
+        {"list", ze_list},         {"mount", ze_mount},    {"rename", ze_rename},   {"set", ze_set},
+        {"snapshot", ze_snapshot}, {"unmount", ze_unmount}};
 
     /* Check correct number of parameters were input */
     if (argc < 2) {
@@ -128,21 +120,23 @@ main(int argc, char *argv[]) {
     } else {
         /* Shift commandline arguments removing the program name. */
         for (int i = 0; i < ze_argc; i++) {
-            ze_argv[i] = argv[i+1];
+            ze_argv[i] = argv[i + 1];
         }
     }
 
     // TODO: Add back after testing
-//    if (strcmp(ze_argv[0], "list") != 0) {
-//        if(geteuid() != 0) {
-//            fprintf(stderr, "Permission denied, try again as root.\n");
-//            return EXIT_FAILURE;
-//        }
-//    }
+    //    if (strcmp(ze_argv[0], "list") != 0) {
+    //        if(geteuid() != 0) {
+    //            fprintf(stderr, "Permission denied, try again as root.\n");
+    //            return EXIT_FAILURE;
+    //        }
+    //    }
 
     if ((lzeh = libze_init()) == NULL) {
-        fprintf(stderr, "%s: System may not be configured correctly "
-               "for boot environments\n", ZE_PROGRAM);
+        fprintf(stderr,
+                "%s: System may not be configured correctly "
+                "for boot environments\n",
+                ZE_PROGRAM);
         return EXIT_FAILURE;
     }
 
@@ -162,7 +156,8 @@ main(int argc, char *argv[]) {
         }
         fprintf(stderr,
                 "WARNING: No bootloader plugin found under bootloader=%s.\n"
-                       "Continuing with no bootloader plugin.\n", plugin);
+                "Continuing with no bootloader plugin.\n",
+                plugin);
         (void) libze_error_clear(lzeh);
     }
 
@@ -187,8 +182,7 @@ main(int argc, char *argv[]) {
     }
 
     // Get command requested
-    command_func ze_command = get_command(ze_command_map,
-                                          NUM_COMMANDS, ze_argv[0]);
+    command_func ze_command = get_command(ze_command_map, NUM_COMMANDS, ze_argv[0]);
     // Run command if valid
     if (!ze_command) {
         fprintf(stderr, "\n%s: Invalid input, no match found.\n", ZE_PROGRAM);

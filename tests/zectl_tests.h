@@ -5,4 +5,4 @@
 #ifndef ZECTL_ZECTL_TESTS_H
 #define ZECTL_ZECTL_TESTS_H
 
-#endif //ZECTL_ZECTL_TESTS_H
+#endif // ZECTL_ZECTL_TESTS_H

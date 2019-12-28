@@ -1,13 +1,13 @@
+#include "zectl.h"
+#include "zectl_util.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/nvpair.h>
 #include <unistd.h>
 
-#include "zectl.h"
-#include "zectl_util.h"
-
-#define HEADER_PROPERTY   "PROPERTY"
-#define HEADER_VALUE      "VALUE"
+#define HEADER_PROPERTY "PROPERTY"
+#define HEADER_VALUE "VALUE"
 
 typedef struct get_value_widths {
     size_t property;
@@ -34,16 +34,15 @@ print_properties(libze_handle *lzeh, nvlist_t *properties, get_options *options)
 
             if ((set_column_width_lookup(prop, &widths.value, "value") != 0) ||
                 (set_column_width(&widths.property, nvpair_name(pair)))) {
-                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                        "Failed getting property widths");
+                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed getting property widths");
             }
         }
 
         tab_suffix = "";
         widths.property += HEADER_SPACING;
         widths.value += HEADER_SPACING;
-        printf("%-*s", (int)widths.property, HEADER_PROPERTY);
-        printf("%-*s", (int)widths.value, HEADER_VALUE);
+        printf("%-*s", (int) widths.property, HEADER_PROPERTY);
+        printf("%-*s", (int) widths.value, HEADER_VALUE);
         fputs("\n", stdout);
     }
 
@@ -51,9 +50,9 @@ print_properties(libze_handle *lzeh, nvlist_t *properties, get_options *options)
          pair = nvlist_next_nvpair(properties, pair)) {
         nvpair_value_nvlist(pair, &prop);
         char *string_prop;
-        printf("%-*s%s", (int)widths.property, nvpair_name(pair), tab_suffix);
+        printf("%-*s%s", (int) widths.property, nvpair_name(pair), tab_suffix);
         if (nvlist_lookup_string(prop, "value", &string_prop) == 0) {
-            printf("%-*s%s", (int)widths.value, string_prop, tab_suffix);
+            printf("%-*s%s", (int) widths.value, string_prop, tab_suffix);
         }
         fputs("\n", stdout);
     }
@@ -73,9 +72,7 @@ ze_get(libze_handle *lzeh, int argc, char **argv) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
     nvlist_t *properties = NULL;
-    get_options options = {
-            .tab_delimited = B_FALSE
-    };
+    get_options options = {.tab_delimited = B_FALSE};
 
     opterr = 0;
     int opt;
