@@ -1,6 +1,9 @@
 #ifndef ZECTL_ZECTL_UTIL_H
 #define ZECTL_ZECTL_UTIL_H
 
+#include <stddef.h>
+#include <sys/nvpair.h>
+
 #include "zectl.h"
 
 int

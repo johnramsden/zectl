@@ -67,7 +67,7 @@ get_command(command_map_t *ze_command_map,
 }
 
 /**
- * @brief Helper function to set default proprrties
+ * @brief Helper function to set default properties
  * @param[in] lzeh Initialized lzeh libze handle
  * @return 0 on success, nonzero on failure
  *
@@ -79,7 +79,8 @@ define_default_props(libze_handle *lzeh) {
         return -1;
     }
     if ((libze_default_prop_add(&default_props, "bootloader", "", ZE_PROP_NAMESPACE) != 0) ||
-        (libze_default_prop_add(&default_props, "bootpool", "", ZE_PROP_NAMESPACE) != 0)) {
+        (libze_default_prop_add(&default_props, "bootpool_root", "", ZE_PROP_NAMESPACE) != 0) ||
+        (libze_default_prop_add(&default_props, "bootpool_prefix", "", ZE_PROP_NAMESPACE) != 0)) {
         return -1;
     }
 
@@ -165,14 +166,22 @@ main(int argc, char *argv[]) {
         (void) libze_error_clear(lzeh);
     }
 
+    /* Initialize the root structure of a separate bootpool if available */
     if (libze_boot_pool_set(lzeh) != LIBZE_ERROR_SUCCESS) {
         fputs(lzeh->libze_error_message, stderr);
         ret = EXIT_FAILURE;
         goto fin;
     }
 
+    /* Validate the running and activated boot environment */
+    if (libze_validate_system(lzeh) != LIBZE_ERROR_SUCCESS) {
+        fputs(lzeh->libze_error_message, stderr);
+        ret = EXIT_FAILURE;
+        goto fin;
+    }
+
     if (define_default_props(lzeh) != 0) {
-        fprintf(stderr, "%s: Failed to set default propertiess\n", ZE_PROGRAM);
+        fprintf(stderr, "%s: Failed to set default properties\n", ZE_PROGRAM);
         ret = EXIT_FAILURE;
         goto fin;
     }

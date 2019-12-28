@@ -3,8 +3,8 @@
 
 #include <mntent.h>
 
-#include "system_linux.h"
 #include "libze/libze_util.h"
+#include "system_linux.h"
 
 /**
  * @brief Given a mountpoint get the dataset mounted

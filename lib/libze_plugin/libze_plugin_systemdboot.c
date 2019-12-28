@@ -295,7 +295,7 @@ update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
     int interr = 0;
 
     char active_be[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_boot_env_name(lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
+    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                 "Bootfs exceeds max path length.\n");
     }
@@ -582,7 +582,7 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
     int iret = 0;
 
     char active_be[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_boot_env_name(lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
+    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                 "Bootfs exceeds max path length.\n");
     }

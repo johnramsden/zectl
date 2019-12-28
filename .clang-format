@@ -2,7 +2,7 @@
 AlignAfterOpenBracket: Align
 AllowShortBlocksOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 BreakAfterJavaFieldAnnotations: true
 BreakBeforeBraces: Attach
@@ -10,7 +10,7 @@ BreakBeforeTernaryOperators: false
 ColumnLimit: 100
 IncludeBlocks: Regroup
 IndentCaseLabels: true
-IndentPPDirectives: BeforeHash
+IndentPPDirectives: AfterHash
 IndentWidth: 4
 IndentWrappedFunctionNames: false
 Language: Cpp

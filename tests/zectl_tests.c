@@ -2,11 +2,11 @@
 // Created by john on 1/2/19.
 //
 
-#include <stdio.h>
 #include <check.h>
+#include <stdio.h>
 
-#include "zectl_tests.h"
 #include "libze/libze.h"
+#include "zectl_tests.h"
 
 START_TEST (test_libze_init)
     {

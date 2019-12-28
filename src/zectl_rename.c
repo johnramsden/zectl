@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "zectl.h"
 
 libze_error
@@ -23,8 +27,8 @@ ze_rename(libze_handle *lzeh, int argc, char **argv) {
         return LIBZE_ERROR_UNKNOWN;
     }
 
-    if (strchr(argv[1], '/') == 0) {
-        fprintf(stderr, "%s rename: Boot environment name cannot contain '/'\n", ZE_PROGRAM);
+    if (strchr(argv[1], '/') != NULL) {
+        fprintf(stderr, "%s rename: Boot environment name can't contain '/'\n", ZE_PROGRAM);
         return LIBZE_ERROR_UNKNOWN;
     }
 

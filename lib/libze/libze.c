@@ -3,20 +3,19 @@
 #define _LARGEFILE_SOURCE
 #define _LARGEFILE64_SOURCE
 
+#include <dirent.h>
+#include <libzfs_core.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/nvpair.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+
 #include "libze/libze.h"
 #include "libze/libze_util.h"
 #include "libze/libze_plugin_manager.h"
-
-#include <string.h>
-#include <stdarg.h>
-#include <stdio.h>
-
-#include <sys/nvpair.h>
-#include <libzfs_core.h>
-#include <dirent.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
 
 // Unsigned long long is 64 bits or more
 #define ULL_SIZE 128
@@ -68,6 +67,229 @@ parse_property(const char property[static 1], char property_prefix[ZFS_MAXPROPLE
     }
     if (strlcpy(property_prefix, prop_prefix, ZFS_MAXPROPLEN) >= ZFS_MAXPROPLEN) {
         return LIBZE_ERROR_MAXPATHLEN;
+    }
+    return ret;
+}
+
+/**
+ * @brief Checks if the specified boot environment name is valid and exists
+ * 
+ * @note A result will only be written to a output buffer if the provided address is not NULL.
+ * 
+ * @param[in] lzeh Initialized @p libze_handle
+ * @param[in] be Name of the boot environment
+ * @param[out] be_ds Used to return the name of the dataset of the specified boot environment
+ * @param[out] be_bpool_ds Used to return the name of the dataset of the bootpool of the specified boot environment
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_EEXIST if the dataset does not exist,
+ *         @p LIBZE_ERROR_LIBZFS if the mountpoint of the boot environment can't be read,
+ *         @p LIBZE_ERROR_MAXPATHLEN if a name or path length exceeded,
+ *         @p LIBZE_ERROR_ZFS_OPEN if the dataset exists but can't be opened
+ *         @p LIBZE_ERROR_MOUNTPOINT if the dataset exists but is not mountable
+ */
+static libze_error
+validate_existing_be(libze_handle *lzeh, const char be[static 1], 
+                     char be_ds[ZFS_MAX_DATASET_NAME_LEN], 
+                     char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    zfs_handle_t *be_ds_hndl = NULL;
+    zfs_handle_t *be_bpool_ds_hndl = NULL;
+    char be_ds_int[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_bpool_ds_int[ZFS_MAX_DATASET_NAME_LEN] = "";
+
+    /* Check dataset path */
+    if (libze_util_concat(lzeh->env_root, "/", be, ZFS_MAX_DATASET_NAME_LEN, be_ds_int) 
+            != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "Boot environment dataset (%s/%s) exceeds max length (%d).\n",
+                               lzeh->env_root, be, ZFS_MAX_DATASET_NAME_LEN);
+    }
+    /* Check if dataset exists */
+    if (!zfs_dataset_exists(lzeh->lzh, be_ds_int, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                               "Boot environment dataset (%s) doesn't exist.\n", be_ds_int);
+    }
+    /* Check if dataset can be opened */
+    be_ds_hndl = zfs_open(lzeh->lzh, be_ds_int, ZFS_TYPE_FILESYSTEM);
+    if (be_ds_hndl == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                               "Failed to open boot environment dataset (%s).\n", be_ds_int);
+    }
+    /* Check mountpoint property */
+    char prop_buf[ZFS_MAXPROPLEN] = "";
+    if (zfs_prop_get(be_ds_hndl, ZFS_PROP_MOUNTPOINT, prop_buf, ZFS_MAXPROPLEN, NULL, NULL, 0, 1)) {
+        zfs_close(be_ds_hndl);
+        return libze_error_set(lzeh, LIBZE_ERROR_LIBZFS,
+                               "Failed to get mountpoint property of boot environment dataset (%s)."
+                               "\n", be_ds_int);
+    }
+    zfs_close(be_ds_hndl);
+    if (strcmp(prop_buf, "none") == 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MOUNTPOINT,
+                               "Mountpoint of boot environment dataset (%s) is set to 'none'.\n",
+                               be_ds_int);
+    }
+
+    if (lzeh->bootpool.pool_zhdl != NULL) {
+        /* Check dataset path on bootpool */
+        if (libze_util_concat(lzeh->bootpool.root_path_full, "", be, ZFS_MAX_DATASET_NAME_LEN, 
+                              be_bpool_ds_int) != LIBZE_ERROR_SUCCESS) {
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                                   "Boot environment dataset on bootpool (%s%s) exceeds max length "
+                                   "(%d).\n", lzeh->bootpool.root_path_full, be,
+                                   ZFS_MAX_DATASET_NAME_LEN);
+        }
+        /* Check if dataset on bootpool exists */
+        if (!zfs_dataset_exists(lzeh->lzh, be_bpool_ds_int, ZFS_TYPE_FILESYSTEM)) {
+            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                                    "Boot environment dataset on bootpool (%s) doesn't exist.\n",
+                                    be_bpool_ds_int);
+        }
+        /* Check if dataset on bootpool can be opened */
+        be_bpool_ds_hndl = zfs_open(lzeh->lzh, be_bpool_ds_int, ZFS_TYPE_FILESYSTEM);
+        if (be_bpool_ds_hndl == NULL) {
+            return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                                   "Failed to open boot environment dataset on bootpool (%s).\n",
+                                   be_bpool_ds_int);
+        }
+        zfs_close(be_bpool_ds_hndl);
+    }
+
+    /* Write results back */
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        if (be_ds != NULL) {
+            (void)strlcpy(be_ds, be_ds_int, ZFS_MAX_DATASET_NAME_LEN);
+        }
+        if (be_bpool_ds != NULL) {
+            (void)strlcpy(be_bpool_ds, be_bpool_ds_int, ZFS_MAX_DATASET_NAME_LEN);
+        }
+    }
+    return ret;
+}
+
+/**
+ * @brief Checks if the specified boot environment is valid and doesn't exist
+ * 
+ * @note A result will only be written to a output buffer if the provided address is not NULL.
+ * 
+ * @param[in] lzeh Initialized @p libze_handle
+ * @param[in] be Name of a possible new boot environment
+ * @param[out] be_ds Used to return the name of the dataset of the specified boot environment
+ * @param[out] be_bpool_ds Used to return the name of the dataset of the bootpool of the specified boot environment
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_EEXIST if the dataset does exist,
+ *         @p LIBZE_ERROR_MAXPATHLEN if a name or path length exceeded
+ */
+static libze_error
+validate_new_be(libze_handle *lzeh, const char be[static 1], char be_ds[ZFS_MAX_DATASET_NAME_LEN], 
+                char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    char be_ds_int[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_bpool_ds_int[ZFS_MAX_DATASET_NAME_LEN] = "";
+
+    /* Check dataset path */
+    if (libze_util_concat(lzeh->env_root, "/", be, ZFS_MAX_DATASET_NAME_LEN, be_ds_int) 
+            != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                                "Boot environment dataset (%s/%s) exceeds max length (%d).\n",
+                                lzeh->env_root, be, ZFS_MAX_DATASET_NAME_LEN);
+    }
+    /* Check if dataset doesn't exists */
+    if (zfs_dataset_exists(lzeh->lzh, be_ds_int, ZFS_TYPE_FILESYSTEM)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                                "Boot environment dataset (%s) exists.\n", be_ds_int);
+
+    }
+
+    if (lzeh->bootpool.pool_zhdl != NULL) {
+        /* Check dataset path on bootpool */
+        if (libze_util_concat(lzeh->bootpool.root_path_full, "", be, ZFS_MAX_DATASET_NAME_LEN, 
+                              be_bpool_ds_int) != LIBZE_ERROR_SUCCESS) {
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                                   "Boot environment dataset on bootpool (%s%s) exceeds max length "
+                                   "(%d).\n", lzeh->bootpool.root_path_full, be,
+                                   ZFS_MAX_DATASET_NAME_LEN);
+        }
+        /* Check if dataset on bootpool doesn't exists */
+        if (zfs_dataset_exists(lzeh->lzh, be_bpool_ds_int, ZFS_TYPE_FILESYSTEM)) {
+            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                                   "Boot environment dataset on bootpool (%s) exists.\n",
+                                   be_bpool_ds_int);
+        }
+    }
+
+    /* Write results back */
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        if (be_ds != NULL) {
+            (void)strlcpy(be_ds, be_ds_int, ZFS_MAX_DATASET_NAME_LEN);
+        }
+        if (be_bpool_ds != NULL) {
+            (void)strlcpy(be_bpool_ds, be_bpool_ds_int, ZFS_MAX_DATASET_NAME_LEN);
+        }
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Open and return the handle(s) from the dataset(s) corresponding to the specified boot
+ *        environment. In case that no bootpool is available, @p be_bpool_zh will be set to NULL.
+ *        In case that an error occurred, both handles will be set to NULL and an error is returned.
+ * 
+ * @note A result will only be written to a output buffer if the provided address is not NULL.
+ *
+ * @param[in] lzeh Initialized @p libze_handle
+ * @param[in] be Is the name of a boot environment
+ * @param[out] be_zh Used to return the opened dataset handle of the specified boot environment
+ * @param[out] be_bpool_zh Used to return the opened dataset handle of the bootpool of the specified boot environment
+ * @param[out] be_ds Used to return the name of the dataset of the specified boot environment
+ * @param[out] be_bpool_ds Used to return the name of the dataset of the bootpool of the specified boot environment
+ * @return @p LIBZE_ERROR_SUCCESS on success
+ */
+static libze_error
+open_boot_environment(libze_handle* lzeh, const char be[static 1], zfs_handle_t **be_zh,
+                      char be_ds[ZFS_MAX_DATASET_NAME_LEN], zfs_handle_t **be_bpool_zh,
+                      char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    zfs_handle_t *be_zh_int = NULL, *be_bpool_zh_int = NULL;
+    char be_ds_int[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_bpool_ds_int[ZFS_MAX_DATASET_NAME_LEN] = "";
+
+    if ((ret = validate_existing_be(lzeh, be, be_ds_int, be_bpool_ds_int)) != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    /* Open ZFS dataset(s) */
+    be_zh_int = zfs_open(lzeh->lzh, be_ds_int, ZFS_TYPE_FILESYSTEM);
+    if (be_zh_int == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN, 
+                               "Failed to open boot environment dataset (%s).\n", be_ds_int);
+    }
+    if (strlen(be_bpool_ds_int) > 0) {
+        be_bpool_zh_int = zfs_open(lzeh->lzh, be_bpool_ds_int, ZFS_TYPE_FILESYSTEM);
+        if (be_bpool_zh_int == NULL) {
+            zfs_close(be_zh_int);
+            be_zh_int = NULL;
+            return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                                   "Failed to open boot environment datast on bootpool (%s).\n",
+                                   be_bpool_ds_int);
+        }
+    }
+ 
+    /* Write results back */
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        if (be_zh != NULL) {
+            *be_zh = be_zh_int;
+        }
+        if (be_ds != NULL) {
+            (void)strlcpy(be_ds, be_ds_int, ZFS_MAX_DATASET_NAME_LEN);
+        }
+        if (be_bpool_zh_int != NULL) {
+            *be_bpool_zh = be_bpool_zh_int;
+        }
+        if (be_bpool_ds != NULL) {
+            (void)strlcpy(be_bpool_ds, be_bpool_ds_int, ZFS_MAX_DATASET_NAME_LEN);
+        }
     }
     return ret;
 }
@@ -208,7 +430,7 @@ libze_default_prop_add(nvlist_t **prop_out, const char *name, const char *value,
     }
 
     char name_buf[ZFS_MAXPROPLEN] = "";
-    if (libze_util_concat(namespace, ":", name, ZFS_MAXPROPLEN, name_buf) != 0) {
+    if (libze_util_concat(namespace, ":", name, ZFS_MAXPROPLEN, name_buf) != LIBZE_ERROR_SUCCESS) {
         goto err;
     }
 
@@ -352,7 +574,7 @@ libze_be_prop_get(libze_handle *lzeh, char *result_prop, const char *property,
     nvlist_t *lookup_prop = NULL;
 
     char prop_buf[ZFS_MAXPROPLEN] = "";
-    if (libze_util_concat(namespace, ":", property, ZFS_MAXPROPLEN, prop_buf) != 0) {
+    if (libze_util_concat(namespace, ":", property, ZFS_MAXPROPLEN, prop_buf) != LIBZE_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
             "Exceeded length of property.\n");
     }
@@ -409,15 +631,15 @@ libze_be_props_get(libze_handle *lzeh, nvlist_t **result, const char *namespace)
     nvlist_t *filtered_user_props = NULL;
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    zfs_handle_t *zhp = zfs_open(lzeh->lzh, lzeh->be_root, ZFS_TYPE_FILESYSTEM);
+    zfs_handle_t *zhp = zfs_open(lzeh->lzh, lzeh->env_root, ZFS_TYPE_FILESYSTEM);
     if (zhp == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed opening handle to %s.\n", lzeh->be_root);
+                "Failed opening handle to %s.\n", lzeh->env_root);
     }
 
     if ((user_props = zfs_get_user_props(zhp)) == NULL) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed to retieve user properties for %s.\n", zfs_get_name(zhp));
+                "Failed to retrieve user properties for %s.\n", zfs_get_name(zhp));
         goto err;
     }
 
@@ -439,6 +661,50 @@ err:
     fnvlist_free(user_props);
     fnvlist_free(filtered_user_props);
     return ret;
+}
+
+
+/**
+ * @brief Prepend an error message to the already specified error message to 
+ *        @p lzeh->libze_error_message and return the error type given in @p lze_err.
+ * @param[in,out] initialized lzeh libze handle
+ * @param[in] lze_err Error value returned
+ * @param[in] lze_fmt Format specifier used by @p lzeh
+ * @param ... Variable args used to format the error message saved in @p lzeh
+ * @return @p lze_err
+ *
+ * @pre @p lzeh != NULL
+ * @pre if @p lze_fmt == NULL, @p ... should have zero arguments.
+ * @pre Length of formatted string < @p LIBZE_MAX_ERROR_LEN
+ */
+libze_error
+libze_error_prepend(libze_handle *lzeh, libze_error lze_err, const char *lze_fmt, ...) {
+    if (lzeh == NULL) {
+        return lze_err;
+    }
+
+    char error_buff[LIBZE_MAX_ERROR_LEN] = "";
+    (void)strlcpy(error_buff, lzeh->libze_error_message, LIBZE_MAX_ERROR_LEN);
+
+    lzeh->libze_error = lze_err;
+
+    if (lze_fmt == NULL) {
+        strlcpy(lzeh->libze_error_message, "", LIBZE_MAX_ERROR_LEN);
+        return lze_err;
+    }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wuninitialized"
+    va_list argptr;
+    va_start(argptr, lze_fmt);
+    int length = vsnprintf(lzeh->libze_error_message, LIBZE_MAX_ERROR_LEN, lze_fmt, argptr);
+    va_end(argptr);
+#pragma clang diagnostic pop
+
+    // Not worth failing on assert? Will just truncate
+    // assert(length < LIBZE_MAX_ERROR_LEN);
+    (void)strlcat(lzeh->libze_error_message, error_buff, LIBZE_MAX_ERROR_LEN);
+
+    return lze_err;
 }
 
 /**
@@ -555,10 +821,10 @@ libze_bootloader_set(libze_handle *lzeh) {
                         "Failed to initialize plugin %s\n", plugin);
             }
         }
-        if (libze_plugin_close(p_handle) != 0) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN,
-                    "Failed to close plugin %s\n", plugin);
-        }
+        // if (libze_plugin_close(p_handle) != 0) {
+        //     ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN,
+        //             "Failed to close plugin %s\n", plugin);
+        // }
     }
 
     return ret;
@@ -584,12 +850,12 @@ libze_handle_rep_check_init(libze_handle *lzeh) {
         return -1;
     }
 
-    if ((lzeh->lzh == NULL) || (lzeh->lzph == NULL) || ((lzeh->ze_props == NULL))) {
+    if ((lzeh->lzh == NULL) || (lzeh->pool_zhdl == NULL) || ((lzeh->ze_props == NULL))) {
         (void) strlcat(check_failure, "A handle isn't initialized\n", LIBZE_MAX_ERROR_LEN);
         ret++;
     }
-    if (!((strlen(lzeh->be_root) >= 1) && (strlen(lzeh->rootfs) >= 3) &&
-          (strlen(lzeh->bootfs) >= 3) && (strlen(lzeh->zpool) >= 1))) {
+    if (!((strlen(lzeh->env_root) >= 1) && (strlen(lzeh->env_running_path) >= 3) && (strlen(lzeh->env_running) >= 1) &&
+          (strlen(lzeh->env_activated_path) >= 3) && (strlen(lzeh->env_activated) >= 1) && (strlen(lzeh->env_pool) >= 1))) {
         (void) strlcat(check_failure, "Lengths of strings incorrect\n", LIBZE_MAX_ERROR_LEN);
         ret++;
     }
@@ -606,44 +872,139 @@ libze_handle_rep_check_init(libze_handle *lzeh) {
 }
 
 /**
- * @brief Check if a boot pool is set, if it is, set @p lzeh->bootpool
+ * @brief Check if a bootpool is set, if it is, set @p lzeh->bootpool
  * @param lzeh Initialized @p libze_handle
  * @return @p LIBZE_ERROR_SUCCESS if no boot pool set, or if boot pool dataset set successfully.
  *         @p LIBZE_ERROR_MAXPATHLEN if requested boot pool is too long.
- *         @p LIBZE_ERROR_ZFS_OPEN if @p lzeh->bootpool.lzbph can't be opened,
+ *         @p LIBZE_ERROR_ZFS_OPEN if @p lzeh->bootpool.pool_zhdl can't be opened,
  *         @p LIBZE_ERROR_MAXPATHLEN if @p bootpool too long
  */
 libze_error
 libze_boot_pool_set(libze_handle *lzeh) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
+    
+    zfs_handle_t *zph_activated = NULL;
+    zfs_handle_t *zph_running = NULL;
 
-    char boot_pool[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if ((ret = libze_be_prop_get(lzeh, boot_pool, "bootpool", ZE_PROP_NAMESPACE)) != LIBZE_ERROR_SUCCESS) {
+    // NOTE constant string
+    char bpool_root_path[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if ((ret = libze_be_prop_get(lzeh, bpool_root_path, "bootpool_root", ZE_PROP_NAMESPACE)) !=
+        LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+    char boot_prefix[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if ((ret = libze_be_prop_get(lzeh, boot_prefix, "bootpool_prefix", ZE_PROP_NAMESPACE)) != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
 
-    // Boot pool is not set
-    if (strlen(boot_pool) == 0) {
-        lzeh->bootpool.lzbph = NULL;
-        (void) strlcpy(lzeh->bootpool.boot_pool_root, "", ZFS_MAX_DATASET_NAME_LEN);
+    if (strlen(bpool_root_path) == 0) {
+        // No parameters are set, assume there is no separate boot pool
+        lzeh->bootpool.pool_zhdl = NULL;
+        (void)strlcpy(lzeh->bootpool.zpool_name, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.root_path, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.root_path_full, "", ZFS_MAX_DATASET_NAME_LEN);
+        (void)strlcpy(lzeh->bootpool.dataset_prefix, "", ZFS_MAX_DATASET_NAME_LEN);
         return ret;
     }
 
-    zfs_handle_t *zph = zfs_open(lzeh->lzh, boot_pool, ZFS_TYPE_FILESYSTEM);
+    char bpool_name[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_get_zpool_name_from_dataset(bpool_root_path, ZFS_MAX_DATASET_NAME_LEN, bpool_name) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST, "Can't determine ZFS pool name of specified root path (%s).\n",
+                               bpool_root_path);
+    }
+    zpool_handle_t *pool_zhdl;
+    if ((pool_zhdl = zpool_open(lzeh->lzh, bpool_name)) == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN, "Can't open ZFS bootpool (%s).\n", bpool_name);
+    }
+
+    // NOTE constant string
+    if (!zfs_dataset_exists(lzeh->lzh, bpool_root_path, ZFS_TYPE_DATASET)) { // NOLINT(hicpp-signed-bitwise)
+        return libze_error_set(
+            lzeh, LIBZE_ERROR_EEXIST,
+            "Root path (bootpool:root) which holds all boot datasets on the bootpool (%s) does not exist.\n",
+            bpool_root_path);
+    }
+
+    zfs_handle_t *zph = zfs_open(lzeh->lzh, bpool_root_path, ZFS_TYPE_FILESYSTEM);
     if (zph == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Failed to open boot pool root '%s'\n", boot_pool);
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN, "Failed to open root dataset from bootpool (%s).\n",
+                               bpool_root_path);
     }
 
-    if (strlcpy(lzeh->bootpool.boot_pool_root, boot_pool, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
-        // Maintain invariant, don't leave inconsistent
-        (void) strlcpy(lzeh->bootpool.boot_pool_root, "", ZFS_MAX_DATASET_NAME_LEN);
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Requested boot pool is too long\n");
+    char prop_buf[ZFS_MAXPROPLEN] = "";
+    if (zfs_prop_get(zph, ZFS_PROP_MOUNTPOINT, prop_buf, ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_LIBZFS, "Failed to get ZFS mountpoint property for %s.\n",
+                               bpool_root_path);
+        goto err;
     }
 
-    lzeh->bootpool.lzbph = zph;
+    char bpool_path_temp[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat(bpool_root_path, "/", boot_prefix, ZFS_MAX_DATASET_NAME_LEN, bpool_path_temp) !=
+        LIBZE_ERROR_SUCCESS) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "Requested path to bootpool (%s/%s) exceeds max length (%d).\n", bpool_root_path,
+                               boot_prefix, ZFS_MAX_DATASET_NAME_LEN);
+        goto err;
+    }
 
+    char bpool_root_path_full[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (strlen(boot_prefix) > 0) {
+        if (libze_util_concat(bpool_path_temp, "-", "", ZFS_MAX_DATASET_NAME_LEN, bpool_root_path_full) !=
+            LIBZE_ERROR_SUCCESS) {
+            ret = libze_error_set(
+                lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Requested subpath for activated boot environment on bootpool (%s-) exceeds max length (%d).\n",
+                bpool_path_temp, ZFS_MAX_DATASET_NAME_LEN);
+            goto err;
+        }
+    }
+    else {
+        strlcpy(bpool_root_path_full, bpool_path_temp, ZFS_MAX_DATASET_NAME_LEN);
+    }
+
+    // No errors has been found, write the handle and paths to bootpool back
+    lzeh->bootpool.pool_zhdl = pool_zhdl;
+    strlcpy(lzeh->bootpool.zpool_name, bpool_name, ZFS_MAX_DATASET_NAME_LEN);
+    strlcpy(lzeh->bootpool.root_path, bpool_root_path, ZFS_MAX_DATASET_NAME_LEN);
+    strlcpy(lzeh->bootpool.root_path_full, bpool_root_path_full, ZFS_MAX_DATASET_NAME_LEN);
+    strlcpy(lzeh->bootpool.dataset_prefix, boot_prefix, ZFS_MAX_DATASET_NAME_LEN);
+
+err:
+    if (zph != NULL) {
+        zfs_close(zph);
+    }
+    if (zph_activated != NULL) {
+        zfs_close(zph_activated);
+    }
+    if (zph_running != NULL) {
+        zfs_close(zph_running);
+    }
     return ret;
+
+}
+
+/**
+ * @brief Check if the activated and running boot environment are in a valid state and mountable.
+ * @param lzeh Initialized @p libze_handle
+ * @return @p LIBZE_ERROR_SUCCESS on success
+ */
+libze_error
+libze_validate_system(libze_handle *lzeh) {
+    /* Validate activated environment */
+    if (validate_existing_be(lzeh, lzeh->env_activated, NULL, NULL) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to validate the activated boot environment (%s)! "
+                                   "Error:\n", lzeh->env_activated);
+    }
+    /* Validate running environment */
+    if (!libze_is_root_be(lzeh, lzeh->env_activated)) {
+        if (validate_existing_be(lzeh, lzeh->env_running, NULL, NULL) != LIBZE_ERROR_SUCCESS) {
+            return libze_error_prepend(lzeh, lzeh->libze_error,
+                                       "Failed to validate the running boot environment (%s)! "
+                                       "Error:\n", lzeh->env_running);
+        }
+    }
+    return LIBZE_ERROR_SUCCESS;
 }
 
 /**
@@ -665,35 +1026,41 @@ libze_init(void) {
     if (libze_get_root_dataset(lzeh) != 0) {
         goto err;
     }
-    if (libze_util_cut(lzeh->rootfs, ZFS_MAX_DATASET_NAME_LEN, lzeh->be_root, '/') != 0) {
+    if (libze_util_cut(lzeh->env_running_path, ZFS_MAX_DATASET_NAME_LEN, lzeh->env_root, '/') != 0) {
         goto err;
     }
-    if ((slashp = strchr(lzeh->be_root, '/')) == NULL) {
+    if ((slashp = strchr(lzeh->env_root, '/')) == NULL) {
         goto err;
     }
 
-    size_t pool_length = (slashp)-(lzeh->be_root);
+    size_t pool_length = (slashp)-(lzeh->env_root);
     zpool = calloc(1, pool_length+1);
     if (zpool == NULL) {
         goto err;
     }
 
     // Get pool portion of dataset
-    if (strncpy(zpool, lzeh->be_root, pool_length) == NULL) {
+    if (strncpy(zpool, lzeh->env_root, pool_length) == NULL) {
         goto err;
     }
     zpool[pool_length] = '\0';
 
-    if (strlcpy(lzeh->zpool, zpool, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+    if (strlcpy(lzeh->env_pool, zpool, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
         goto err;
     }
 
-    if ((lzeh->lzph = zpool_open(lzeh->lzh, lzeh->zpool)) == NULL) {
+    if ((lzeh->pool_zhdl = zpool_open(lzeh->lzh, lzeh->env_pool)) == NULL) {
         goto err;
     }
 
-    if (zpool_get_prop(lzeh->lzph, ZPOOL_PROP_BOOTFS, lzeh->bootfs,
-            sizeof(lzeh->bootfs), NULL, B_TRUE) != 0) {
+    if (zpool_get_prop(lzeh->pool_zhdl, ZPOOL_PROP_BOOTFS, lzeh->env_activated_path,
+            sizeof(lzeh->env_activated_path), NULL, B_TRUE) != 0) {
+        goto err;
+    }
+
+    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, lzeh->env_activated) != 0) {
+        strlcpy(lzeh->env_activated_path, "", sizeof(lzeh->env_activated_path));
+        strlcpy(lzeh->env_activated, "", sizeof(lzeh->env_activated));
         goto err;
     }
 
@@ -704,9 +1071,12 @@ libze_init(void) {
     // Clear bootloader
     lzeh->lz_funcs = NULL;
 
-    // Clear bootpool
-    lzeh->bootpool.lzbph = NULL;
-    (void) strlcpy(lzeh->bootpool.boot_pool_root, "", ZFS_MAX_DATASET_NAME_LEN);
+    // Clear bootpool, initialization is done later
+    lzeh->bootpool.pool_zhdl = NULL;
+    (void)strlcpy(lzeh->bootpool.zpool_name, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.root_path, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.root_path_full, "", ZFS_MAX_DATASET_NAME_LEN);
+    (void)strlcpy(lzeh->bootpool.dataset_prefix, "", ZFS_MAX_DATASET_NAME_LEN);
 
     (void) libze_error_clear(lzeh);
 
@@ -728,8 +1098,8 @@ err:
  * @param lzeh @p libze_handle to de-allocate and close resources on.
  *
  * @post @p lzeh->lzh is closed
- * @post @p lzeh->lzph is closed
- * @post @p llzeh->bootpool.lzbph is closed
+ * @post @p lzeh->pool_zhdl is closed
+ * @post @p lzeh->bootpool.pool_zhdl is closed
  * @post @p lzeh->ze_props is free'd
  * @post @p lzeh is free'd
  */
@@ -744,9 +1114,9 @@ libze_fini(libze_handle *lzeh) {
         lzeh->lzh = NULL;
     }
 
-    if (lzeh->lzph != NULL) {
-        zpool_close(lzeh->lzph);
-        lzeh->lzph = NULL;
+    if (lzeh->pool_zhdl != NULL) {
+        zpool_close(lzeh->pool_zhdl);
+        lzeh->pool_zhdl = NULL;
     }
 
     if (lzeh->ze_props != NULL) {
@@ -755,9 +1125,9 @@ libze_fini(libze_handle *lzeh) {
     }
 
     // Cleanup bootloader
-    if (lzeh->bootpool.lzbph != NULL) {
-        zfs_close(lzeh->bootpool.lzbph);
-        lzeh->bootpool.lzbph = NULL;
+    if (lzeh->bootpool.pool_zhdl != NULL) {
+        zpool_close(lzeh->bootpool.pool_zhdl);
+        lzeh->bootpool.pool_zhdl = NULL;
     }
 
     free(lzeh);
@@ -793,7 +1163,7 @@ libze_activate_cb(zfs_handle_t *zhdl, void *data) {
 
     // Check if clone
     if (zfs_prop_get(zhdl, ZFS_PROP_ORIGIN, buf,
-            sizeof(buf), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         // Not a clone, continue
         return 0;
     }
@@ -842,7 +1212,7 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
         // Not currently mounted
         char tmpdir_template[ZFS_MAX_DATASET_NAME_LEN] = "";
         if (libze_util_concat("/tmp/ze.", options->be_name, ".XXXXXX",
-                ZFS_MAX_DATASET_NAME_LEN, tmpdir_template) != 0) {
+                ZFS_MAX_DATASET_NAME_LEN, tmpdir_template) != LIBZE_ERROR_SUCCESS) {
             return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                     "Could not create directory template\n");
         }
@@ -884,7 +1254,7 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
 
 err:
     if (!is_root && zfs_is_mounted(be_zh, NULL)) {
-        // Retain existing error if occurrred
+        // Retain existing error if occurred
         if ((zfs_unmount(be_zh, NULL, 0) != 0) && (ret != LIBZE_ERROR_SUCCESS)) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                     "Failed to unmount %s", ds_name);
@@ -911,37 +1281,31 @@ err:
 libze_error
 libze_activate(libze_handle *lzeh, libze_activate_options *options) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
+    zfs_handle_t *be_zh = NULL, *be_bpool_zh = NULL;
+    char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
 
-    char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if (libze_util_concat(lzeh->be_root, "/", options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested boot environment %s exceeds max length %d\n",
-                options->be_name, ZFS_MAX_DATASET_NAME_LEN);
+    if (open_boot_environment(lzeh, options->be_name, &be_zh, be_ds, &be_bpool_zh, NULL)
+        != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to open boot environment (%s) for activation!\n",
+                                   options->be_name);
     }
 
-    if (!zfs_dataset_exists(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET)) { // NOLINT(hicpp-signed-bitwise)
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Boot environment %s does not exist\n", options->be_name);
-    }
+    /* ZFS handle is open, on failure goto err */
 
-
+    /* Plugin - Pre Activate */
     if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_pre_activate(lzeh) != 0)) {
-        return LIBZE_ERROR_PLUGIN;
-    }
-
-    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, be_ds_buff, ZFS_TYPE_DATASET); // NOLINT(hicpp-signed-bitwise)
-    if (be_zh == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Failed opening dataset %s\n", be_ds_buff);
+        ret = LIBZE_ERROR_PLUGIN;
+        goto err;
     }
 
     if (mid_activate(lzeh, options, be_zh) != LIBZE_ERROR_SUCCESS) {
         goto err;
     }
 
-    if (zpool_set_prop(lzeh->lzph, "bootfs", be_ds_buff) != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Failed setting bootfs=%s\n", be_ds_buff);
+    if (zpool_set_prop(lzeh->pool_zhdl, "bootfs", be_ds) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, 
+                "Failed to set the pool property 'bootfs=%s'.\n", be_ds);
         goto err;
     }
 
@@ -959,12 +1323,24 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
         goto err;
     }
 
+    if (be_bpool_zh != NULL) {
+        if (libze_activate_cb(be_bpool_zh, &cbd) != 0) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                "Failed to activate the requested boot environment on bootpool (%s).\n", 
+                                options->be_name);
+        }
+    }
+
+    /* Plugin - Post Activate */
     if ((lzeh->lz_funcs != NULL) && (lzeh->lz_funcs->plugin_post_activate(lzeh, options->be_name) != 0)) {
         goto err;
     }
 
 err:
     zfs_close(be_zh);
+    if (be_bpool_zh != NULL) {
+        zfs_close(be_bpool_zh);
+    }
     return ret;
 }
 
@@ -1006,8 +1382,8 @@ clone_prop_cb(int prop, void *data) {
         return ZPROP_CONT;
     }
 
-    if (zfs_prop_get(pcbd->zhp, prop, propbuf, sizeof(propbuf), &src, statbuf,
-            sizeof(statbuf), B_FALSE) != 0) {
+    if (zfs_prop_get(pcbd->zhp, prop, propbuf, ZFS_MAXPROPLEN, &src, statbuf,
+            ZFS_MAXPROPLEN, B_FALSE) != 0) {
         return ZPROP_CONT;
     }
 
@@ -1138,7 +1514,7 @@ libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suf
         char ds_child_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
         if (libze_util_suffix_after_string(source_root, ds_name, ZFS_MAX_DATASET_NAME_LEN, be_child_buf) == 0) {
             if (strlen(be_child_buf) > 0) {
-                if (libze_util_concat(be, be_child_buf, "/", ZFS_MAX_DATASET_NAME_LEN, ds_child_buf) != 0) {
+                if (libze_util_concat(be, be_child_buf, "/", ZFS_MAX_DATASET_NAME_LEN, ds_child_buf) != LIBZE_ERROR_SUCCESS) {
                     ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                             "Requested child clone exceeds max length %d\n", ZFS_MAX_DATASET_NAME_LEN);
                     goto err;
@@ -1154,7 +1530,7 @@ libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suf
         }
 
         if (libze_util_concat(ds_name, "@", source_snap_suffix,
-                ZFS_MAX_DATASET_NAME_LEN, ds_snap_buf) != 0) {
+                ZFS_MAX_DATASET_NAME_LEN, ds_snap_buf) != LIBZE_ERROR_SUCCESS) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                     "Requested snapshot exceeds max length %d\n", ZFS_MAX_DATASET_NAME_LEN);
             goto err;
@@ -1233,9 +1609,7 @@ get_snap_and_dataset(const char source_snap[ZFS_MAX_DATASET_NAME_LEN],
  * @param source_be_name Source boot environment name
  * @param dest_dataset Destination full dataset
  * @param dest_snapshot_suffix Destination snapshot suffix
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_MAXPATHLEN if @p ZFS_MAX_DATASET_NAME_LEN exceeded,
- *         @p LIBZE_ERROR_UNKNOWN if no snapshot suffix found
+ * @return @p LIBZE_ERROR_SUCCESS on success
  */
 static libze_error
 prepare_existing_boot_pool_data(libze_handle *lzeh, const char source_snap[ZFS_MAX_DATASET_NAME_LEN],
@@ -1250,31 +1624,29 @@ prepare_existing_boot_pool_data(libze_handle *lzeh, const char source_snap[ZFS_M
             return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                     "Source snapshot %s doesn't contain snapshot suffix or is too long.\n",
                     source_snap);
-        default: break;
+        default:
+            break;
     }
 
-    int len = libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/",
-            source_be_name, ZFS_MAX_DATASET_NAME_LEN, dest_dataset);
-    if (len >= ZFS_MAX_DATASET_NAME_LEN) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Boot pool dataset is too long.\n");
+    /* Validate source boot environment */
+    char source_bpool_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (validate_existing_be(lzeh, source_be_name, NULL, source_bpool_ds) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to validate existing boot environment (%s)!\n",
+                                   source_be_name);
     }
 
-    if (!zfs_dataset_exists(lzeh->lzh, dest_dataset, ZFS_TYPE_FILESYSTEM)) {
+    char ds_snap_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat(source_bpool_ds, "@", source_snap, ZFS_MAX_DATASET_NAME_LEN, ds_snap_buf)
+            != LIBZE_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Source boot pool dataset doesn't exist.\n");
-    }
-
-    char ds_snap_buf[ZFS_MAX_DATASET_NAME_LEN];
-    len = libze_util_concat(dest_dataset, "@", source_snap, ZFS_MAX_DATASET_NAME_LEN, ds_snap_buf);
-    if (len >= ZFS_MAX_DATASET_NAME_LEN) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Boot pool snapshot is too long.\n");
+                "Boot pool snapshot (%s@%s) is too long (%d).\n", 
+                source_bpool_ds, source_snap, ZFS_MAX_DATASET_NAME_LEN);
     }
 
     if (!zfs_dataset_exists(lzeh->lzh, ds_snap_buf, ZFS_TYPE_SNAPSHOT)) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Source boot pool snapshot doesn't exist.\n");
+                "Source boot pool snapshot (%s) doesn't exist.\n", ds_snap_buf);
     }
 
     return LIBZE_ERROR_SUCCESS;
@@ -1340,18 +1712,18 @@ libze_create(libze_handle *lzeh, libze_create_options *options) {
     create_data cdata;
     create_data boot_pool_cdata;
 
-    // Populate cdata from existing dataset or snap
+    /* Populate cdata from existing dataset or snap */
     if (options->existing) {
         ret = prepare_create_from_existing(lzeh, options->be_source, &cdata);
         if (ret != LIBZE_ERROR_SUCCESS) {
             return ret;
         }
 
-        if (lzeh->bootpool.lzbph != NULL) {
+        if (lzeh->bootpool.pool_zhdl != NULL) {
             /* Setup source as (boot pool root)/env/(existing name)
              * Since from existing, use snap suffix from existing */
-            char dest_ds_buf[ZFS_MAX_DATASET_NAME_LEN];
-            char dest_snap_buf[ZFS_MAX_DATASET_NAME_LEN];
+            char dest_ds_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
+            char dest_snap_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
             ret = prepare_existing_boot_pool_data(lzeh, options->be_source, options->be_name,
                     dest_ds_buf, dest_snap_buf);
             if (ret != LIBZE_ERROR_SUCCESS) {
@@ -1364,15 +1736,15 @@ libze_create(libze_handle *lzeh, libze_create_options *options) {
         }
     } else { // Populate cdata from bootfs
         cdata.is_snap = B_FALSE;
-        if (strlcpy(cdata.source_dataset, lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+        if (strlcpy(cdata.source_dataset, lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
             return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                    "Source dataset %s exceeds max dataset length.\n", lzeh->bootfs);
+                    "Source dataset %s exceeds max dataset length.\n", lzeh->env_activated_path);
         }
         char snap_buf[ZFS_MAX_DATASET_NAME_LEN];
         (void) gen_snap_suffix(ZFS_MAX_DATASET_NAME_LEN, cdata.snap_suffix);
         int len = libze_util_concat(cdata.source_dataset, "@",
                 cdata.snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf);
-        if (len >= ZFS_MAX_DATASET_NAME_LEN) {
+        if (len != LIBZE_ERROR_SUCCESS) {
             return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                     "Source dataset snapshot will exceed max dataset length.\n");
         }
@@ -1382,53 +1754,41 @@ libze_create(libze_handle *lzeh, libze_create_options *options) {
                     "Failed to create snapshot %s.\n", snap_buf);
         }
 
-        if (lzeh->bootpool.lzbph != NULL) {
+        if (lzeh->bootpool.pool_zhdl != NULL) {
             boot_pool_cdata.is_snap = B_FALSE;
-            char be_name[ZFS_MAX_DATASET_NAME_LEN];
-            // Boot env name
-            if (libze_boot_env_name(lzeh->bootfs, ZFS_MAX_DATASET_NAME_LEN, be_name) != 0) {
-                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                        "Failed get boot environment for %s.\n", lzeh->bootfs);
-            }
-            if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/",
-                    be_name, ZFS_MAX_DATASET_NAME_LEN, boot_pool_cdata.source_dataset) != 0) {
+            (void)libze_util_concat(lzeh->bootpool.root_path_full, lzeh->env_running, "",
+                                    ZFS_MAX_DATASET_NAME_LEN, boot_pool_cdata.source_dataset);
+            (void)strlcpy(boot_pool_cdata.snap_suffix, cdata.snap_suffix, ZFS_MAX_DATASET_NAME_LEN);
+            if (libze_util_concat(boot_pool_cdata.source_dataset, "@", boot_pool_cdata.snap_suffix,
+                                  ZFS_MAX_DATASET_NAME_LEN, snap_buf) != LIBZE_ERROR_SUCCESS) {
                 return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                        "Source boot pool dataset exceeds max dataset length.\n");
-            }
-            // We already checked length above
-            (void) strlcpy(boot_pool_cdata.snap_suffix, cdata.snap_suffix, ZFS_MAX_DATASET_NAME_LEN);
-            len = libze_util_concat(boot_pool_cdata.source_dataset, "@",
-                    boot_pool_cdata.snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf);
-            if (len >= ZFS_MAX_DATASET_NAME_LEN) {
-                return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                        "Source boot pool dataset snapshot will exceed max dataset length.\n");
+                                       "Source boot pool dataset snapshot (%s@%s) exceeds max dataset length (%d).\n",
+                                       boot_pool_cdata.source_dataset, boot_pool_cdata.snap_suffix,
+                                       ZFS_MAX_DATASET_NAME_LEN);
             }
             if (zfs_snapshot(lzeh->lzh, snap_buf, options->recursive, NULL) != 0) {
-                return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                        "Failed to create snapshot %s.\n", snap_buf);
+                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to create snapshot (%s).\n", snap_buf);
             }
         }
     }
 
-    char clone_buf[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_util_concat(lzeh->be_root, "/", options->be_name,
-            ZFS_MAX_DATASET_NAME_LEN, clone_buf) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "New boot environment will exceed max dataset length.\n");
+    /* Validate new boot environment */
+    char new_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char new_bpool_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (validate_new_be(lzeh, options->be_name, new_ds, new_bpool_ds) != LIBZE_ERROR_SUCCESS) { 
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to validate new boot environment (%s)!\n",
+                                   options->be_name);
     }
-    if (libze_clone(lzeh, cdata.source_dataset, cdata.snap_suffix,
-            clone_buf, options->recursive) != LIBZE_ERROR_SUCCESS) {
+    if (libze_clone(lzeh, cdata.source_dataset, cdata.snap_suffix, new_ds, options->recursive) 
+            != LIBZE_ERROR_SUCCESS) {
         return LIBZE_ERROR_UNKNOWN;
     }
-    if (lzeh->bootpool.lzbph != NULL) {
-        if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/", options->be_name,
-                ZFS_MAX_DATASET_NAME_LEN, clone_buf) != 0) {
-            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                    "New boot pool dataset will exceed max dataset length.\n");
-        }
+    if (strlen(new_bpool_ds) > 0) {
         if (libze_clone(lzeh, boot_pool_cdata.source_dataset, boot_pool_cdata.snap_suffix,
-                clone_buf, options->recursive) != LIBZE_ERROR_SUCCESS) {
-            return LIBZE_ERROR_UNKNOWN;
+                        new_bpool_ds, options->recursive) != LIBZE_ERROR_SUCCESS) {
+            return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                   "The dataset on the bootpool (%s) can't be cloned.\n", new_bpool_ds);
         }
     }
 
@@ -1470,7 +1830,7 @@ libze_destroy_cb(zfs_handle_t *zh, void *data) {
     if ((strchr(zfs_get_name(zh), '@') == NULL) && cbd->options->destroy_origin) {
         // Check if clone, origin snapshot saved to buffer
         char buf[ZFS_MAX_DATASET_NAME_LEN];
-        if (zfs_prop_get(zh, ZFS_PROP_ORIGIN, buf, sizeof(buf), NULL, NULL, 0, 1) == 0) {
+        if (zfs_prop_get(zh, ZFS_PROP_ORIGIN, buf, ZFS_MAX_DATASET_NAME_LEN, NULL, NULL, 0, 1) == 0) {
             // Destroy origin snapshot
             origin_h = zfs_open(cbd->lzeh->lzh, buf, ZFS_TYPE_SNAPSHOT);
             if (origin_h == NULL) {
@@ -1509,7 +1869,7 @@ libze_destroy_cb(zfs_handle_t *zh, void *data) {
  * @param filesystem Clone or boot environment full name
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_ZFS_OPEN if @p filesystem can't be opened,
- *         @p LIBZE_ERROR_EEXIST if @p filesystem doesnt exist,
+ *         @p LIBZE_ERROR_EEXIST if @p filesystem doesn't exist,
  */
 static libze_error
 destroy_filesystem(libze_handle *lzeh, libze_destroy_options *options,
@@ -1545,14 +1905,13 @@ destroy_filesystem(libze_handle *lzeh, libze_destroy_options *options,
  * @param lzeh Initialized @p libze_handle
  * @param options Destroy options
  * @param snapshot Snapshot full name
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_ZFS_OPEN if @p snapshot dataset can't be opened,
- *         @p LIBZE_ERROR_EEXIST if @p snapshot doesnt exist, or isnt a BE,
- *         @p LIBZE_ERROR_MAXPATHLEN if snapshot name is too long
+ * @param snapshot_bpool Snapshot full name on bootpool or NULL if not used
+ * @return @p LIBZE_ERROR_SUCCESS on success
  */
 static libze_error
 destroy_snapshot(libze_handle *lzeh, libze_destroy_options *options,
-                 const char snapshot[ZFS_MAX_DATASET_NAME_LEN]) {
+                 const char snapshot[ZFS_MAX_DATASET_NAME_LEN],
+                 const char snapshot_bpool[ZFS_MAX_DATASET_NAME_LEN]) {
     if (!zfs_dataset_exists(lzeh->lzh, snapshot, ZFS_TYPE_SNAPSHOT)) {
         return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
                 "Snapshot %s does not exist\n", snapshot);
@@ -1563,30 +1922,18 @@ destroy_snapshot(libze_handle *lzeh, libze_destroy_options *options,
     // Get boot environment name, we know ZFS_MAX_DATASET_NAME_LEN wont be exceeded
     (void) libze_util_cut(options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_snap_ds_buff, '@');
 
-    // Join BE name with BE root to verify requested snap is from a BE
-    if (libze_util_concat(lzeh->be_root, "/", be_snap_ds_buff,
-            ZFS_MAX_DATASET_NAME_LEN, be_full_ds) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested boot environment %s exceeds max length %d\n",
-                options->be_name, ZFS_MAX_DATASET_NAME_LEN);
-    }
-
-    if (!zfs_name_valid(be_full_ds, ZFS_TYPE_FILESYSTEM)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Invalid dataset %s\n", be_full_ds);
-    }
-
-    if (!zfs_dataset_exists(lzeh->lzh, be_full_ds, ZFS_TYPE_FILESYSTEM)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Dataset %s does not exist\n", be_full_ds);
+    /* Validate that snapshot is from a boot environment */
+    if (validate_existing_be(lzeh, be_snap_ds_buff, NULL, NULL) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to validate corresponding boot environment (%s) to "
+                                   " snapshot!\n", be_snap_ds_buff);
     }
 
     zfs_handle_t *be_zh = zfs_open(lzeh->lzh, snapshot, ZFS_TYPE_SNAPSHOT);
     if (be_zh == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Failed opening dataset %s\n", snapshot);
+                "Failed opening snapshot (%s).\n", snapshot);
     }
-
     if (zfs_destroy(be_zh, B_FALSE) != 0) {
         zfs_close(be_zh);
         return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
@@ -1594,85 +1941,99 @@ destroy_snapshot(libze_handle *lzeh, libze_destroy_options *options,
     }
     zfs_close(be_zh);
 
+    if (snapshot_bpool != NULL) {
+        if (!zfs_dataset_exists(lzeh->lzh, snapshot_bpool, ZFS_TYPE_SNAPSHOT)) {
+            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                    "Snapshot on bootpool (%s) does not exist.\n", snapshot_bpool);
+        }
+        zfs_handle_t *be_bpool_zh = zfs_open(lzeh->lzh, snapshot_bpool, ZFS_TYPE_SNAPSHOT);
+        if (be_bpool_zh == NULL) {
+            return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
+                    "Failed opening snapshot on bootpool (%s).\n", snapshot_bpool);
+        }
+        if (zfs_destroy(be_bpool_zh, B_FALSE) != 0) {
+            zfs_close(be_bpool_zh);
+            return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
+                    "Failed to destroy snapshot on bootpool (%s).\n", snapshot_bpool);
+        }
+        zfs_close(be_bpool_zh);
+    }
+
     return LIBZE_ERROR_SUCCESS;
-}
-
-/**
- * @brief Check if a boot pool is set, if it is destroy the associated dataset.
- *        Dataset should be: bootpool + "/boot/env/ze-" + be
- * @param lzeh Initialized @p libze_handle
- * @param options Destroy options
- * @return @p LIBZE_ERROR_SUCCESS if no boot pool set, if boot pool dataset doesn't exist,
- *             or if boot pool dataset destroyed successfully.
- *         @p LIBZE_ERROR_MAXPATHLEN if requested boot pool is too long.
- *         @p LIBZE_ERROR_ZFS_OPEN if @p filesystem can't be opened,
- *         @p LIBZE_ERROR_EEXIST if @p filesystem doesnt exist,
- */
-static libze_error
-libze_destroy_boot_pool(libze_handle *lzeh, libze_destroy_options *options) {
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    if (lzeh->bootpool.lzbph == NULL) {
-        // No bootpool set
-        return ret;
-    }
-
-    char boot_pool_dataset[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/",
-            options->be_name, ZFS_MAX_DATASET_NAME_LEN, boot_pool_dataset) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Requested boot pool is too long.\n");
-    }
-
-    ret = destroy_filesystem(lzeh, options, boot_pool_dataset);
-    // Ignore if doesn't exist, could be an old non-bootpool BE
-    switch (ret) {
-        case LIBZE_ERROR_EEXIST: return LIBZE_ERROR_SUCCESS;
-        case LIBZE_ERROR_SUCCESS: return LIBZE_ERROR_SUCCESS;
-        default: return ret;
-    }
 }
 
 /**
  * @brief Destroy a boot environment
  * @param lzeh Initialized @p libze_handle
  * @param options Destroy options
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_MAXPATHLEN If the requested environment to destroy is too long,
- *         @p LIBZE_ERROR_UNKNOWN If the environment is active,
- *         @p LIBZE_ERROR_EEXIST If the environment doesn't exist,
- *         @p LIBZE_ERROR_ZFS_OPEN If the dataset couldn't be opened,
- *         @p LIBZE_ERROR_PLUGIN If the plugin hook failed
+ * @return @p LIBZE_ERROR_SUCCESS on success
  */
 libze_error
 libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
+    zfs_handle_t *be_zh = NULL, *be_bpool_zh = NULL;
+    char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
 
-    char be_ds_buff[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if (libze_util_concat(lzeh->be_root, "/", options->be_name, ZFS_MAX_DATASET_NAME_LEN, be_ds_buff) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested boot environment %s exceeds max length %d\n",
-                options->be_name, ZFS_MAX_DATASET_NAME_LEN);
-    }
-
-    if (libze_is_active_be(lzeh, be_ds_buff)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Cannot destroy active boot environment %s\n", options->be_name);
-    }
-    if (libze_is_root_be(lzeh, be_ds_buff)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Cannot destroy root boot environment %s\n", options->be_name);
-    }
-
-    if ((strchr(be_ds_buff, '@') == NULL)) {
-        if ((ret = destroy_filesystem(lzeh, options, be_ds_buff)) != LIBZE_ERROR_SUCCESS) {
-            return ret;
+    if ((strchr(options->be_name, '@') == NULL)) {
+        if (open_boot_environment(lzeh, options->be_name, &be_zh, be_ds, &be_bpool_zh, be_bpool_ds)
+                != LIBZE_ERROR_SUCCESS) {
+            return libze_error_prepend(lzeh, lzeh->libze_error,
+                                       "Failed to open boot environment (%s) which should be "
+                                       "destroyed.\n", options->be_name);
         }
 
-        if ((ret = libze_destroy_boot_pool(lzeh, options)) != LIBZE_ERROR_SUCCESS) {
+        if (libze_is_active_be(lzeh, be_ds)) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                  "Cannot destroy active boot environment (%s).\n",
+                                  options->be_name);
+            goto err;
+        }
+        if (libze_is_root_be(lzeh, be_ds)) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                  "Cannot destroy root boot environment (%s).\n", options->be_name);
+            goto err;
+        }
+
+        if ((ret = destroy_filesystem(lzeh, options, be_ds)) != LIBZE_ERROR_SUCCESS) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                  "Failed to destroy the requested boot environment (%s).\n", 
+                                  options->be_name);
+            goto err;
+        }
+
+        if (be_bpool_zh != NULL) {
+            libze_destroy_cbdata cbd = { .lzeh = lzeh, .options = options };
+            if (libze_destroy_cb(be_bpool_zh, &cbd) != 0) {
+                ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                      "Failed to destroy the requested boot environment on bootpool"
+                                      " (%s).\n", options->be_name);
+            }
+err:
+            zfs_close(be_zh);
+            if (be_bpool_zh != NULL) {
+                zfs_close(be_bpool_zh);
+            }
             return ret;
         }
-    } else {
-        if ((ret = destroy_snapshot(lzeh, options, be_ds_buff)) != LIBZE_ERROR_SUCCESS) {
+    }
+    else {
+        if (libze_util_concat(lzeh->env_root, "/", options->be_name, ZFS_MAX_DATASET_NAME_LEN,
+                              be_ds) != LIBZE_ERROR_SUCCESS) {
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                                   "The snapshot name (%s%s) exceeds max length (%d).\n",
+                                   lzeh->env_root, options->be_name, ZFS_MAX_DATASET_NAME_LEN);
+        }
+        if (lzeh->bootpool.pool_zhdl != NULL) {
+            if (libze_util_concat(lzeh->bootpool.root_path_full, "", options->be_name,
+                                  ZFS_MAX_DATASET_NAME_LEN, be_bpool_ds) != LIBZE_ERROR_SUCCESS) {
+                return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                                       "The snapshot name for the bootpool (%s%s) exceeds max "
+                                       "length (%d).\n", lzeh->env_root, options->be_name,
+                                       ZFS_MAX_DATASET_NAME_LEN);
+            }
+        }
+        if ((ret = destroy_snapshot(lzeh, options, be_ds, be_bpool_ds)) != LIBZE_ERROR_SUCCESS) {
             return ret;
         }
     }
@@ -1681,7 +2042,6 @@ libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
         return LIBZE_ERROR_PLUGIN;
     }
 
-    return ret;
 }
 
 /**********************************
@@ -1704,12 +2064,13 @@ typedef struct libze_list_cbdata {
  */
 static int
 libze_list_cb(zfs_handle_t *zhdl, void *data) {
-    libze_list_cbdata_t *cbd = data;
-    char prop_buffer[ZFS_MAXPROPLEN];
-    char dataset[ZFS_MAX_DATASET_NAME_LEN];
-    char be_name[ZFS_MAX_DATASET_NAME_LEN];
-    char mountpoint[ZFS_MAX_DATASET_NAME_LEN];
     int ret = LIBZE_ERROR_SUCCESS;
+
+    libze_list_cbdata_t *cbd = data;
+    char prop_buffer[ZFS_MAXPROPLEN] = "";
+    char dataset[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_name[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char mountpoint[ZFS_MAX_DATASET_NAME_LEN] = "";
     nvlist_t *props = NULL;
 
     const char *handle_name = zfs_get_name(zhdl);
@@ -1721,7 +2082,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
 
     // Name
     if (zfs_prop_get(zhdl, ZFS_PROP_NAME, dataset,
-            sizeof(dataset), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAX_DATASET_NAME_LEN, NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed get 'name' property for %s.\n", handle_name);
         goto err;
@@ -1739,7 +2100,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     // Mountpoint
     char mounted[ZFS_MAX_DATASET_NAME_LEN];
     if (zfs_prop_get(zhdl, ZFS_PROP_MOUNTED, mounted,
-            sizeof(mounted), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAX_DATASET_NAME_LEN, NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed get 'mounted' for %s.\n", handle_name);
         goto err;
@@ -1748,7 +2109,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     int is_mounted = strcmp(mounted, "yes");
     if (is_mounted == 0) {
         if (zfs_prop_get(zhdl, ZFS_PROP_MOUNTPOINT, mountpoint,
-                sizeof(mountpoint), NULL, NULL, 0, 1) != 0) {
+                ZFS_MAX_DATASET_NAME_LEN, NULL, NULL, 0, 1) != 0) {
             ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                     "Failed get 'mountpoint' for %s.\n", handle_name);
             goto err;
@@ -1758,7 +2119,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
 
     // Creation
     if (zfs_prop_get(zhdl, ZFS_PROP_CREATION, prop_buffer,
-            sizeof(prop_buffer), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         ret = libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed get 'creation' for %s.\n", handle_name);
         goto err;
@@ -1775,7 +2136,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     fnvlist_add_string(props, "creation", t_buf);
 
     // Nextboot
-    boolean_t is_nextboot = (strcmp(cbd->lzeh->bootfs, dataset) == 0);
+    boolean_t is_nextboot = (strcmp(cbd->lzeh->env_activated_path, dataset) == 0);
     fnvlist_add_boolean_value(props, "nextboot", is_nextboot);
 
     // Active
@@ -1801,16 +2162,11 @@ libze_error
 libze_list(libze_handle *lzeh, nvlist_t **outnvl) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    if ((libzfs_core_init()) != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_LIBZFS, "Failed to initialize libzfs_core.\n");
-        goto err;
-    }
-
     // Get be root handle
     zfs_handle_t *zroot_hdl = NULL;
-    if ((zroot_hdl = zfs_open(lzeh->lzh, lzeh->be_root, ZFS_TYPE_FILESYSTEM)) == NULL) {
+    if ((zroot_hdl = zfs_open(lzeh->lzh, lzeh->env_root, ZFS_TYPE_FILESYSTEM)) == NULL) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_LIBZFS,
-                "Failed to open handle to %s.\n", lzeh->be_root);
+                              "Failed to open handle to %s.\n", lzeh->env_root);
         goto err;
     }
 
@@ -1828,7 +2184,6 @@ libze_list(libze_handle *lzeh, nvlist_t **outnvl) {
 
 err:
     zfs_close(zroot_hdl);
-    libzfs_core_fini();
     return ret;
 }
 
@@ -1853,7 +2208,6 @@ directory_create_if_nonexistent(const char path[static 1]) {
         // Directory exists
         return closedir(dir);
     }
-
     return mkdir(path, 0700);
 }
 
@@ -1871,7 +2225,7 @@ mount_callback(zfs_handle_t *zh, void *data) {
 
     // Get mountpoint
     if (zfs_prop_get(zh, ZFS_PROP_MOUNTPOINT, prop_buf,
-            sizeof(prop_buf), NULL, NULL, 0, 1) != 0) {
+            ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
         (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_UNKNOWN,
                 "Failed to get mountpoint for %s\n.", dataset);
         return -1;
@@ -1884,7 +2238,7 @@ mount_callback(zfs_handle_t *zh, void *data) {
 
     char mountpoint_buf[LIBZE_MAX_PATH_LEN];
     if (libze_util_concat(cbd->mountpoint, "", prop_buf,
-            LIBZE_MAX_PATH_LEN, mountpoint_buf) >= LIBZE_MAX_PATH_LEN) {
+            LIBZE_MAX_PATH_LEN, mountpoint_buf) != LIBZE_ERROR_SUCCESS) {
         (void) libze_error_set(cbd->lzeh, LIBZE_ERROR_MAXPATHLEN,
                 "Exceeded max path length for mount\n.");
         return -1;
@@ -1920,52 +2274,43 @@ mount_callback(zfs_handle_t *zh, void *data) {
  *            If @p NULL a temporary mountpoint will be created
  * @param[in] mountpoint_buffer Mountpoint boot environment was mounted to.
  *            If @p mountpoint was @p NULL, the temporary mountpoint will be here.
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_MAXPATHLEN if a path length exceeded,
- *         @p LIBZE_ERROR_ZFS_OPEN if a dataset handle can't be opened,
- *         @p LIBZE_ERROR_UNKNOWN if failure to set properties
+ * @return @p LIBZE_ERROR_SUCCESS on success
  */
 libze_error
 libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
             const char *mountpoint, char mountpoint_buffer[LIBZE_MAX_PATH_LEN]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
+    char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
     const char *real_mountpoint;
-    char dataset_buffer[ZFS_MAX_DATASET_NAME_LEN];
+    zfs_handle_t *be_zh = NULL, *be_bpool_zh = NULL;
 
-    if (libze_util_concat(lzeh->be_root, "/", boot_environment,
-            ZFS_MAX_DATASET_NAME_LEN, dataset_buffer) != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested boot environment %s exceeds max length %d\n",
-                boot_environment, ZFS_MAX_DATASET_NAME_LEN);
+    if (open_boot_environment(lzeh, boot_environment, &be_zh, be_ds, &be_bpool_zh, be_bpool_ds)
+            != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to open boot environment (%s) for mount!\n",
+                                   boot_environment);
     }
 
-    if (!zfs_dataset_exists(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Requested boot environment %s doesn't exist\n",
-                boot_environment);
-    }
+    /* ZFS handle is open, on failure goto err */
 
-    if (libze_is_root_be(lzeh, dataset_buffer)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Cannot mount root boot environment %s\n",
-                boot_environment);
-    }
-
-    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM);
-    if (be_zh == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Failed to open boot environment %s\n", boot_environment);
+    if (libze_is_root_be(lzeh, be_ds)) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, 
+                              "Can't mount the currently running boot environment (%s).\n",
+                              boot_environment);
+        goto err;
     }
 
     if (zfs_is_mounted(be_zh, NULL)) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Boot environment dataset for %s is already mounted\n", boot_environment);
+                              "The dataset of the boot environment (%s) is already mounted.\n",
+                              boot_environment);
         goto err;
     }
 
     char tmpdir_template[ZFS_MAX_DATASET_NAME_LEN] = "";
     if (libze_util_concat("/tmp/ze.", boot_environment, ".XXXXXX",
-            ZFS_MAX_DATASET_NAME_LEN, tmpdir_template) != 0) {
+            ZFS_MAX_DATASET_NAME_LEN, tmpdir_template) != LIBZE_ERROR_SUCCESS) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                 "Could not create directory template\n");
         goto err;
@@ -1991,7 +2336,7 @@ libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
         goto err;
     }
 
-    if (libze_util_temporary_mount(dataset_buffer, real_mountpoint) != LIBZE_ERROR_SUCCESS) {
+    if (libze_util_temporary_mount(be_ds, real_mountpoint) != LIBZE_ERROR_SUCCESS) {
         if (tmpdir_created) {
             (void) rmdir(real_mountpoint);
         }
@@ -2010,15 +2355,51 @@ libze_mount(libze_handle *lzeh, const char boot_environment[static 1],
         goto err;
     }
 
-    if (lzeh->bootpool.lzbph != NULL) {
-        if (zfs_iter_filesystems(lzeh->bootpool.lzbph, mount_callback, &cbd) != 0) {
-            ret = -1;
+    if (be_bpool_zh != NULL) {
+        /* Mount separate bootpool dataset to .../boot */
+        char prop_buf[ZFS_MAXPROPLEN] = "";
+        if (zfs_prop_get(be_bpool_zh, ZFS_PROP_MOUNTPOINT, prop_buf, ZFS_MAXPROPLEN, NULL, NULL, 0, 1) != 0) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_LIBZFS,
+                                "Failed to get the mountpoint for the requested boot dataset (%s).\n",
+                                be_bpool_ds);
             goto err;
+        }
+        if (strcmp(prop_buf, "legacy") == 0) {
+            char mount_directory_boot[LIBZE_MAX_PATH_LEN] = "";
+            if (libze_util_concat(real_mountpoint, "/", "boot", LIBZE_MAX_PATH_LEN, mount_directory_boot)
+                != LIBZE_ERROR_SUCCESS) {
+                return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, 
+                                       "Path to the boot directory (%s/boot) for the requested boot"
+                                       "dataset (%s) is too long (%d).\n",
+                                       real_mountpoint, boot_environment, LIBZE_MAX_PATH_LEN);
+            }
+
+            if (directory_create_if_nonexistent(mount_directory_boot) != 0) {
+                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                      "Failed to create mountpoint (%s) for (%s), or a file existed there.\n.",
+                                      mount_directory_boot, be_bpool_ds);
+            }
+
+            if (libze_util_temporary_mount(be_bpool_ds, mount_directory_boot) != LIBZE_ERROR_SUCCESS) {
+                return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                       "Failed to mount the boot directory (%s) for the requested "
+                                       "boot dataset (%s) in legacy mode.\n.",
+                                       mount_directory_boot, boot_environment);
+            }
+        }
+        else {
+            // TODO mount temporary if not legacy ...
+            return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                   "Mounting a boot dataset which is not set to 'legacy' is "
+                                   "currently not supported.\n");
         }
     }
 
 err:
     zfs_close(be_zh);
+    if (be_bpool_zh != NULL) {
+        zfs_close(be_bpool_zh);
+    }
     return ret;
 }
 
@@ -2042,96 +2423,42 @@ libze_rename(libze_handle *lzeh, const char boot_environment[static 1],
         const char new_boot_environment[static 1]) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
-    zfs_handle_t *be_zh = NULL;
-    char dataset_buffer[ZFS_MAX_DATASET_NAME_LEN];
-    char new_dataset_buffer[ZFS_MAX_DATASET_NAME_LEN];
+    zfs_handle_t *be_zh = NULL, *be_bpool_zh = NULL;
+    char new_be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char new_be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
 
-    zfs_handle_t *boot_pool_zh = NULL;
-    char boot_pool_ds_buffer[ZFS_MAX_DATASET_NAME_LEN];
-    char new_boot_pool_ds_buffer[ZFS_MAX_DATASET_NAME_LEN];
-
-    // Current dataset
-    if (libze_util_concat(lzeh->be_root, "/", boot_environment,
-            ZFS_MAX_DATASET_NAME_LEN, dataset_buffer) != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested boot environment %s exceeds max length %d\n",
-                boot_environment, ZFS_MAX_DATASET_NAME_LEN);
+    if (validate_new_be(lzeh, new_boot_environment, new_be_ds, new_be_bpool_ds)
+            != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to validate new boot environment (%s)!\n",
+                                   new_boot_environment);
     }
-
-    // Renamed dataset
-    if (libze_util_concat(lzeh->be_root, "/", new_boot_environment,
-            ZFS_MAX_DATASET_NAME_LEN, new_dataset_buffer) != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Renamed boot environment %s exceeds max length %d\n",
-                new_dataset_buffer, ZFS_MAX_DATASET_NAME_LEN);
+    if (open_boot_environment(lzeh, boot_environment, &be_zh, NULL, &be_bpool_zh, NULL) 
+            != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to open boot environment (%s) for renaming.\n",
+                                   boot_environment);
     }
-
-    if (!zfs_dataset_exists(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Requested boot environment %s doesn't exist\n", boot_environment);
-    }
-    if (zfs_dataset_exists(lzeh->lzh, new_dataset_buffer, ZFS_TYPE_FILESYSTEM)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Renamed boot environment %s already exists\n", new_boot_environment);
-    }
-
-    if (libze_is_root_be(lzeh, dataset_buffer)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Cannot rename root boot environment %s\n", boot_environment);
-    }
-    if (libze_is_active_be(lzeh, dataset_buffer)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Cannot rename active boot environment %s\n", boot_environment);
-    }
-
-    be_zh = zfs_open(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM);
-    if (be_zh == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN, "Failed to open %s\n", dataset_buffer);
-    }
-
-    if (zfs_is_mounted(be_zh, NULL)) {
+    if (libze_is_root_be(lzeh, boot_environment)) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Dataset %s is mounted, cannot rename\n", dataset_buffer);
+                              "Can't rename running boot environment (%s).\n", boot_environment);
         goto err;
     }
-
-    // Check boot pool validity
-    if (lzeh->bootpool.lzbph != NULL) {
-        if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/", boot_environment,
-                ZFS_MAX_DATASET_NAME_LEN, boot_pool_ds_buffer) != LIBZE_ERROR_SUCCESS) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                    "Requested boot pool dataset exceeds max length\n");
-            goto err;
-        }
-
-        // Renamed dataset
-        if (libze_util_concat(lzeh->bootpool.boot_pool_root, "/env/", new_boot_environment,
-                ZFS_MAX_DATASET_NAME_LEN, new_boot_pool_ds_buffer) != LIBZE_ERROR_SUCCESS) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                    "Renamed boot environment boot pool dataset exceeds max length\n");
-            goto err;
-        }
-
-        if (!zfs_dataset_exists(lzeh->lzh, boot_pool_ds_buffer, ZFS_TYPE_FILESYSTEM)) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                    "Requested boot pool dataset %s doesn't exist\n", boot_pool_ds_buffer);
-            goto err;
-        }
-        if (zfs_dataset_exists(lzeh->lzh, new_boot_pool_ds_buffer, ZFS_TYPE_FILESYSTEM)) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                    "Renamed boot pool dataset %s already exists\n", new_boot_pool_ds_buffer);
-            goto err;
-        }
-
-        boot_pool_zh = zfs_open(lzeh->lzh, boot_pool_ds_buffer, ZFS_TYPE_FILESYSTEM);
-        if (boot_pool_zh == NULL) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN, "Failed to open %s\n", boot_pool_ds_buffer);
-            goto err;
-        }
-
-        if (zfs_is_mounted(be_zh, NULL)) {
+    if (libze_is_active_be(lzeh, boot_environment)) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                              "Can't rename active boot environment (%s).\n", boot_environment);
+        goto err;
+    }
+    if (zfs_is_mounted(be_zh, NULL)) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                              "Dataset (%s) is mounted, cannot rename.\n", boot_environment);
+        goto err;
+    }
+    if (be_bpool_zh != NULL) {
+        if (zfs_is_mounted(be_bpool_zh, NULL)) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                    "Dataset %s is mounted, cannot rename\n", boot_pool_ds_buffer);
+                                  "Dataset on bootpool (%s) is mounted, cannot rename.\n",
+                                  new_be_bpool_ds);
             goto err;
         }
     }
@@ -2139,24 +2466,25 @@ libze_rename(libze_handle *lzeh, const char boot_environment[static 1],
     // Go ahead with rename, checks passed
 
     // No recurse, no create parents
-    if (zfs_rename(be_zh, new_dataset_buffer, B_FALSE, B_FALSE) != 0) {
+    if (zfs_rename(be_zh, new_be_ds, B_FALSE, B_FALSE) != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                "Rename of dataset %s failed\n", dataset_buffer);
+                              "Rename of boot environment (%s) failed.\n", boot_environment);
         goto err;
     }
 
-    if (lzeh->bootpool.lzbph != NULL) {
+    if (be_bpool_zh != NULL) {
         // No recurse, no create parents
-        if (zfs_rename(boot_pool_zh, new_boot_pool_ds_buffer, B_FALSE, B_FALSE) != 0) {
+        if (zfs_rename(be_bpool_zh, new_be_bpool_ds, B_FALSE, B_FALSE) != 0) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                    "Rename of dataset %s failed\n", boot_pool_zh);
+                                  "Rename of boot environment (%s) on bootpool failed.\n",
+                                  boot_environment);
         }
     }
 
 err:
     zfs_close(be_zh);
-    if (boot_pool_zh != NULL) {
-        zfs_close(boot_pool_zh);
+    if (be_bpool_zh != NULL) {
+        zfs_close(be_bpool_zh);
     }
     return ret;
 }
@@ -2170,17 +2498,17 @@ err:
  * @param[in] lzeh Initialized lzeh libze handle
  * @param[in] properties List of ZFS properties to set
  * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_ZFS_OPEN if failure to open @p lzeh->be_root,
+ *         @p LIBZE_ERROR_ZFS_OPEN if failure to open @p lzeh->env_root,
  *         @p LIBZE_ERROR_UNKNOWN if failure to set properties
  */
 libze_error
 libze_set(libze_handle *lzeh, nvlist_t *properties) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    zfs_handle_t *be_root_zh = zfs_open(lzeh->lzh, lzeh->be_root, ZFS_TYPE_FILESYSTEM);
+    zfs_handle_t *be_root_zh = zfs_open(lzeh->lzh, lzeh->env_root, ZFS_TYPE_FILESYSTEM);
     if (be_root_zh == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Failed to open BE root %s\n", lzeh->be_root);
+                "Failed to open BE root %s\n", lzeh->env_root);
     }
 
     if (zfs_prop_set_list(be_root_zh, properties) != 0) {
@@ -2196,88 +2524,52 @@ libze_set(libze_handle *lzeh, nvlist_t *properties) {
  *************************************/
 
 /**
- * @brief Take a snapshot of boot pool dataset
- * @param[in] lzeh Initialized lzeh libze handle
- * @param[in] boot_environment Boot environment name to snapshot boot pool dataset for
- * @param[in] snap_suffix Snapshot name
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_MAXPATHLEN if max dataset or snapshot length exceeded,
- *         @p LIBZE_ERROR_EEXIST if boot pool dataset nonexsistent
- */
-static libze_error
-snapshot_boot_pool(libze_handle *lzeh, const char boot_environment[static 1],
-                   const char snap_suffix[ZFS_MAX_DATASET_NAME_LEN]) {
-    char boot_pool_buf[ZFS_MAX_DATASET_NAME_LEN];
-    char snap_buf[ZFS_MAX_DATASET_NAME_LEN];
-
-    if (libze_util_concat(zfs_get_name(lzeh->bootpool.lzbph), "/env/",
-            boot_environment, ZFS_MAX_DATASET_NAME_LEN, boot_pool_buf) >= ZFS_MAX_DATASET_NAME_LEN) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested dataset for boot pool exceeds max length \n");
-    }
-
-    if (!zfs_dataset_exists(lzeh->lzh, boot_pool_buf, ZFS_TYPE_FILESYSTEM)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Requested dataset %s for boot pool doesn't exist\n", boot_pool_buf);
-    }
-
-    if (libze_util_concat(boot_pool_buf, "@",
-            snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf) >= ZFS_MAX_DATASET_NAME_LEN) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested snapshot for boot pool exceeds max length \n");
-    }
-
-    if (zfs_snapshot(lzeh->lzh, snap_buf, B_TRUE, NULL) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Failed to take snapshot %s\n", snap_buf);
-    }
-
-    return LIBZE_ERROR_SUCCESS;
-}
-
-/**
  * @brief Take a snapshot of a boot environment
  * @param[in] lzeh Initialized lzeh libze handle
  * @param[in] boot_environment Boot environment name to snapshot
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_MAXPATHLEN if max dataset or snapshot length exceeded,
- *         @p LIBZE_ERROR_EEXIST if a datataset to snapshot is nonexsistent
+ * @return @p LIBZE_ERROR_SUCCESS on success
  */
 libze_error
 libze_snapshot(libze_handle *lzeh, const char boot_environment[static 1]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    char dataset_buffer[ZFS_MAX_DATASET_NAME_LEN];
+    char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char snap_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char snap_suffix[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char snap_bpool_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
 
-    if (libze_util_concat(lzeh->be_root, "/", boot_environment,
-            ZFS_MAX_DATASET_NAME_LEN, dataset_buffer) != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested boot environment %s exceeds max length %d\n",
-                boot_environment, ZFS_MAX_DATASET_NAME_LEN);
+    if ((ret = validate_existing_be(lzeh, boot_environment, be_ds, be_bpool_ds)) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, ret, 
+                                   "Failed validating boot environment (%s) for snapshot.\n",
+                                   boot_environment);
     }
 
-    if (!zfs_dataset_exists(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Requested boot environment %s doesn't exist\n",
-                boot_environment);
-    }
-
-    char snap_buf[ZFS_MAX_DATASET_NAME_LEN];
-    char snap_suffix[ZFS_MAX_DATASET_NAME_LEN];
     (void) gen_snap_suffix(ZFS_MAX_DATASET_NAME_LEN, snap_suffix);
-    if (libze_util_concat(dataset_buffer, "@",
-            snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf) >= ZFS_MAX_DATASET_NAME_LEN) {
+    if (libze_util_concat(be_ds, "@", snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf) != LIBZE_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested snapshot exceeds max length \n");
+                               "Requested snapshot (%s@%s) exceeds max length (%d).\n", 
+                               be_ds, snap_suffix, LIBZE_ERROR_MAXPATHLEN);
+    }
+
+    if (lzeh->bootpool.pool_zhdl != NULL) {
+        if (libze_util_concat(be_bpool_ds, "@", snap_suffix, ZFS_MAX_DATASET_NAME_LEN, 
+                              snap_bpool_buf) != LIBZE_ERROR_SUCCESS) {
+            return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                                   "Snapshot (%s@%s) for bootpool exceeds max length (%d).\n",
+                                   be_bpool_ds, snap_suffix, ZFS_MAX_DATASET_NAME_LEN);
+        }
     }
 
     if (zfs_snapshot(lzeh->lzh, snap_buf, B_TRUE, NULL) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Failed to take snapshot %s\n", snap_buf);
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to take snapshot (%s).\n",
+                               snap_buf);
     }
-
-    if (lzeh->bootpool.lzbph != NULL) {
-        ret = snapshot_boot_pool(lzeh, boot_environment, snap_suffix);
+    if (strlen(be_bpool_ds) > 0) {
+        if (zfs_snapshot(lzeh->lzh, snap_bpool_buf, B_TRUE, NULL) != 0) {
+            return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to take snapshot (%s).\n",
+                                   snap_bpool_buf);
+        }
     }
 
     return ret;
@@ -2290,6 +2582,7 @@ libze_snapshot(libze_handle *lzeh, const char boot_environment[static 1]) {
 typedef struct libze_umount_cb_data {
     libze_handle *lzeh;
 } libze_umount_cb_data;
+
 
 /**
  * @brief Mount callback called for each child of boot environment
@@ -2324,54 +2617,45 @@ unmount_callback(zfs_handle_t *zh, void *data) {
  * @brief Recursively unmount boot environment
  * @param[in] lzeh Initialized lzeh libze handle
  * @param[in] boot_environment Boot environment to unmount
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_MAXPATHLEN if a path length exceeded,
- *         @p LIBZE_ERROR_ZFS_OPEN if a dataset handle can't be opened,
- *         @p LIBZE_ERROR_UNKNOWN if failure to set properties
+ * @return @p LIBZE_ERROR_SUCCESS on success
  */
 libze_error
 libze_unmount(libze_handle *lzeh, const char boot_environment[static 1]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
-    char dataset_buffer[ZFS_MAX_DATASET_NAME_LEN];
+    zfs_handle_t *be_zh = NULL, *be_bpool_zh = NULL;
+    char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
 
-    if (libze_util_concat(lzeh->be_root, "/", boot_environment,
-            ZFS_MAX_DATASET_NAME_LEN, dataset_buffer) != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Requested boot environment %s exceeds max length %d\n",
-                boot_environment, ZFS_MAX_DATASET_NAME_LEN);
+    if (libze_is_root_be(lzeh, boot_environment)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Cannot umount root boot environment (%s).\n", boot_environment);
     }
-
-    if (!zfs_dataset_exists(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Requested boot environment %s doesn't exist\n",
-                boot_environment);
+    if (open_boot_environment(lzeh, boot_environment, &be_zh, be_ds, &be_bpool_zh, NULL)
+            != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to open boot environment (%s) for unmount.\n",
+                                   boot_environment);
     }
-
-    if (libze_is_root_be(lzeh, dataset_buffer)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_EEXIST,
-                "Cannot umount root boot environment %s\n",
-                boot_environment);
-    }
-
-    zfs_handle_t *be_zh = zfs_open(lzeh->lzh, dataset_buffer, ZFS_TYPE_FILESYSTEM);
-    if (be_zh == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Failed to open boot environment %s\n", boot_environment);
-    }
-
     if (!zfs_is_mounted(be_zh, NULL)) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN,
-                "Boot environment dataset for %s is not mounted\n", boot_environment);
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MOUNTPOINT,
+                              "Boot environment dataset for %s is not mounted.\n",
+                              be_ds);
         goto err;
     }
 
-    libze_umount_cb_data cbd = {
-            .lzeh = lzeh
-    };
+    libze_umount_cb_data cbd = { .lzeh = lzeh };
 
-    if (lzeh->bootpool.lzbph != NULL) {
-        if (unmount_callback(lzeh->bootpool.lzbph, &cbd) != 0) {
-            ret = lzeh->libze_error;
+    if (be_bpool_zh != NULL) {
+        if (!zfs_is_mounted(be_bpool_zh, NULL)) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_MOUNTPOINT,
+                                  "Boot environment dataset on bootpool (%s) is not mounted.\n",
+                                  be_bpool_ds);
+            goto err;
+        }
+        if (unmount_callback(be_bpool_zh, &cbd) != 0) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                                  "Failed to unmount the mounted boot dataset (%s).\n",
+                                  be_bpool_ds);
             goto err;
         }
     }
@@ -2383,5 +2667,8 @@ libze_unmount(libze_handle *lzeh, const char boot_environment[static 1]) {
 
 err:
     zfs_close(be_zh);
+    if (be_bpool_zh != NULL) {
+        zfs_close(be_bpool_zh);
+    }
     return ret;
 }

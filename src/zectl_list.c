@@ -1,3 +1,9 @@
+#include <stdio.h>
+#include <string.h>
+#include <sys/nvpair.h>
+#include <unistd.h>
+
+#include "libze/libze_util.h"
 #include "zectl.h"
 #include "zectl_util.h"
 

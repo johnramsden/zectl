@@ -3,13 +3,13 @@
 #define _LARGEFILE_SOURCE
 #define _LARGEFILE64_SOURCE
 
+#include <dirent.h>
 #include <string.h>
 #include <sys/mount.h>
-#include <libze/libze_util.h>
-#include <dirent.h>
 #include <sys/stat.h>
 
 #include "libze/libze.h"
+#include "libze/libze_util.h"
 #include "system_linux.h"
 
 /**
@@ -122,25 +122,35 @@ libze_boot_env_name(const char *dataset, size_t buflen, char buf[buflen]) {
 }
 
 /**
- * @brief Check if boot environment is active
+ * @brief Check if the specified boot environment is set as active
  * @param[in] lzeh Initialized @p libze_handle
- * @param[in] be_dataset Dataset to check if active
- * @return @p B_TRUE if active else @p B_FALSE
+ * @param[in] be Dataset or name of a boot environment to check
+ * @return @p B_TRUE if active, else @p B_FALSE
  */
 boolean_t
-libze_is_active_be(libze_handle *lzeh, const char be_dataset[static 1]) {
-    return ((strcmp(lzeh->bootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
+libze_is_active_be(libze_handle *lzeh, const char be[static 1]) {
+    if (strchr(be, '/') == NULL) {
+        return ((strcmp(lzeh->env_activated, be) == 0) ? B_TRUE : B_FALSE);
+    }
+    else {
+        return ((strcmp(lzeh->env_activated_path, be) == 0) ? B_TRUE : B_FALSE);
+    }
 }
 
 /**
- * @brief Check if boot environment is root dataset
+ * @brief Check if the specified boot environment is currently running.
  * @param[in] lzeh Initialized @p libze_handle
- * @param[in] be_dataset Dataset to check if root dataset
- * @return @p B_TRUE if active else @p B_FALSE
+ * @param[in] be Dataset or name of a boot environment to check
+ * @return @p B_TRUE if running, else @p B_FALSE
  */
 boolean_t
-libze_is_root_be(libze_handle *lzeh, const char be_dataset[static 1]) {
-    return ((strcmp(lzeh->rootfs, be_dataset) == 0) ? B_TRUE : B_FALSE);
+libze_is_root_be(libze_handle *lzeh, const char be[static 1]) {
+    if (strchr(be, '/') == NULL) {
+        return ((strcmp(lzeh->env_running, be) == 0) ? B_TRUE : B_FALSE);
+    }
+    else {
+        return ((strcmp(lzeh->env_running_path, be) == 0) ? B_TRUE : B_FALSE);
+    }
 }
 
 /**
@@ -167,7 +177,7 @@ libze_list_free(nvlist_t *nvl) {
 /**
  * @brief Get the root dataset
  * @param[in] lzeh Initialized @p libze_handle
- * @return Non-zero on success
+ * @return Zero on success
  *
  * @pre lzeh != NULL
  */
@@ -187,12 +197,41 @@ libze_get_root_dataset(libze_handle *lzeh) {
         return -1;
     }
 
-    if (strlcpy(lzeh->rootfs, zfs_get_name(zh), ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+    if (strlcpy(lzeh->env_running_path, zfs_get_name(zh), ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
+        strlcpy(lzeh->env_running_path, "", ZFS_MAX_DATASET_NAME_LEN);
         ret = -1;
+    }
+    else if (libze_boot_env_name(lzeh->env_running_path, ZFS_MAX_DATASET_NAME_LEN, lzeh->env_running) != 0) {
+        ret = -1;
+        strlcpy(lzeh->env_running, "", ZFS_MAX_DATASET_NAME_LEN);
+        strlcpy(lzeh->env_running_path, "", ZFS_MAX_DATASET_NAME_LEN);
     }
 
     zfs_close(zh);
     return ret;
+}
+
+/**
+ * @brief Returns the name of the ZFS pool from the specified dataset (everything to first '/')
+ * @param[in] buflen Length of buffer
+ * @param[out] buf Buffer to place boot environment in
+ * @return Zero on success
+ */
+int
+libze_get_zpool_name_from_dataset(const char dataset[static 3], size_t buflen, char buf[buflen]) {
+    if (buflen > 0) {
+        if (dataset[0] == '/') {
+            return -1;
+        }
+        for (size_t i = 1; i < buflen; ++i) {
+            if (dataset[i] == '/') {
+                (void)strlcpy(buf, dataset, i+1);
+                buf[i] = '\0';
+                return 0;
+            }
+        }
+    }
+    return -1;
 }
 
 libze_error
@@ -241,6 +280,7 @@ libze_util_copy_filepointer(FILE *file, FILE *new_file)
         }
     }
 }
+
 /**
  * @brief Copy binary file into new file
  * @param file Original filename
@@ -304,7 +344,7 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
         return errno;
     }
 
-    /* Check error after for TOCTOU race conditon */
+    /* Check error after for TOCTOU race condition */
     int err = mkdir(new_directory_path, 0700);
     if (err != 0) {
         errno = 0;
@@ -405,7 +445,7 @@ libze_util_replace_string(const char *to_replace, const char *replacement,
     /* Distance between replacement and last replacement */
     size_t len_between_replacements;
 
-    /* Number of occurances of to_replace */
+    /* Number of occurrences of to_replace */
     int count;
 
     size_t len_rep = strlen(to_replace);
