@@ -431,12 +431,8 @@ get_fstab_line_from_regex(libze_handle *lzeh, void *data, char const line[LIBZE_
     re_boot_p = &re_boot_buf;
 
     char replace_two[LIBZE_MAX_PATH_LEN] = "";
-    char replace_four[LIBZE_MAX_PATH_LEN] = "";
 
     ret = libze_util_concat("\\1", rmd->be_name, "\\3", LIBZE_MAX_PATH_LEN, replace_two);
-    if (ret == LIBZE_ERROR_SUCCESS) {
-        ret = libze_util_concat("\\1\\2\\3", rmd->be_name, "\\5", LIBZE_MAX_PATH_LEN, replace_four);
-    }
     if (ret != LIBZE_ERROR_SUCCESS) {
         goto done;
     }
