@@ -629,6 +629,13 @@ update_fstab(libze_handle *lzeh, libze_activate_data *activate_data,
     }
 
     errno = 0;
+    interr = close(fd);
+    if (interr != 0) {
+        remove(tmpfile);
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "close fd %s of %s.\n", fd, tmpfile);
+    }
+
+    errno = 0;
     /* Use rename for atomicity */
     interr = rename(tmpfile, fstab_buf);
     if (interr != 0) {
