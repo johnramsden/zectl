@@ -13,8 +13,24 @@
 
 #define NUM_SYSTEMDBOOT_PROPERTY_VALUES 2
 #define NUM_SYSTEMDBOOT_PROPERTIES 2
-const char *systemdboot_properties[NUM_SYSTEMDBOOT_PROPERTIES][NUM_SYSTEMDBOOT_PROPERTY_VALUES] = {
+char const *systemdboot_properties[NUM_SYSTEMDBOOT_PROPERTIES][NUM_SYSTEMDBOOT_PROPERTY_VALUES] = {
     {"efi", "/efi"}, {"boot", "/boot"}};
+
+struct replace_matched_data {
+    char const *be_name;
+    char const *active_be;
+};
+
+struct replace_fstab_data {
+    char const *be_name;
+    char const *active_be;
+    char const *boot_mountpoint;
+    char const *efi_mountpoint;
+};
+
+typedef libze_error (*line_replace_fn)(libze_handle *lzeh, void *data,
+                                       char const line_buf[LIBZE_MAX_PATH_LEN],
+                                       char replace_line_buf[LIBZE_MAX_PATH_LEN]);
 
 libze_error
 libze_plugin_systemdboot_defaults(libze_handle *lzeh, nvlist_t **default_properties) {
@@ -60,7 +76,7 @@ add_default_properties(libze_handle *lzeh) {
     nvpair_t *default_pair = NULL;
     for (default_pair = nvlist_next_nvpair(defaults_nvl, NULL); default_pair != NULL;
          default_pair = nvlist_next_nvpair(defaults_nvl, default_pair)) {
-        const char *default_nvp_name = nvpair_name(default_pair);
+        char const *default_nvp_name = nvpair_name(default_pair);
 
         // If nvlist already in properties, don't add default
         if (nvlist_exists(lzeh->ze_props, default_nvp_name)) {
@@ -114,58 +130,59 @@ libze_plugin_systemdboot_pre_activate(libze_handle *lzeh) {
     return 0;
 }
 
-/**
- * @brief Using boot mountpoint create a .mount unit string
- * @param lzeh               libze handle
- * @param boot_mountpoint    Mountpoint of boot partition
- * @param unit_buf           Buffer for .mount unit string
- * @return                   @p LIBZE_ERROR_UNKNOWN Boot mountpoint is not set
- *                           @p LIBZE_ERROR_MAXPATHLEN Max path length exceeded
- *                           @p LIBZE_ERROR_SUCCESS On success
- */
 static libze_error
-form_boot_mountpoint_unit(libze_handle *lzeh, char boot_mountpoint[LIBZE_MAX_PATH_LEN],
-                          char be_mountpoint[LIBZE_MAX_PATH_LEN],
-                          char unit_buf[LIBZE_MAX_PATH_LEN]) {
+form_fstab_regex(regex_t *re, char const boot_mountpoint[LIBZE_MAX_PATH_LEN],
+                 char const efi_mountpoint[LIBZE_MAX_PATH_LEN],
+                 char const be_name[LIBZE_MAX_PATH_LEN], char reg_buf[REGEX_BUFLEN]) {
 
-    if (strlen(boot_mountpoint) <= 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Boot mountpoint is not set.\n");
-    }
-    // Remove leading '/' for path name
-    char tmp_boot_mountpoint_buf[ZFS_MAXPROPLEN];
-    if (strlcpy(tmp_boot_mountpoint_buf, boot_mountpoint + 1, LIBZE_MAX_PATH_LEN) >=
-        LIBZE_MAX_PATH_LEN) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                               "Boot mountpoint exceeds max path length.\n");
-    }
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    if ((strlcat(unit_buf, be_mountpoint, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-        (strlcat(unit_buf, SYSTEMD_SYSTEM_UNIT_PATH, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-        (strlcat(unit_buf, "/", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-        (strlcat(unit_buf, tmp_boot_mountpoint_buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-        (strlcat(unit_buf, ".mount", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                               "Boot mountpoint unit path exceeds max path length.\n");
+    char be_no_dots[ZFS_MAX_DATASET_NAME_LEN];
+    char ns_no_dots[ZFS_MAX_DATASET_NAME_LEN];
+    char efi_no_dots[ZFS_MAX_DATASET_NAME_LEN];
+    char boot_no_dots[ZFS_MAX_DATASET_NAME_LEN];
+
+    ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, be_name,
+                                    ZFS_MAX_DATASET_NAME_LEN, be_no_dots);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
     }
 
-    return LIBZE_ERROR_SUCCESS;
-}
+    ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, ZE_PROP_NAMESPACE,
+                                    ZFS_MAX_DATASET_NAME_LEN, ns_no_dots);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
 
-static libze_error
-form_unit_regex(char reg_buf[REGEX_BUFLEN], char prefix[LIBZE_MAX_PATH_LEN],
-                char suffix[ZFS_MAX_DATASET_NAME_LEN]) {
+    ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, efi_mountpoint,
+                                    ZFS_MAX_DATASET_NAME_LEN, efi_no_dots);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
 
-    int ret = snprintf(reg_buf, REGEX_BUFLEN, "^[\t ]*%s[\t ]*=[\t ]*%s[\t\n ]*$", prefix, suffix);
-    if (ret >= REGEX_BUFLEN) {
+    ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, boot_mountpoint,
+                                    ZFS_MAX_DATASET_NAME_LEN, boot_no_dots);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    int intret = snprintf(reg_buf, REGEX_BUFLEN, "\\(^[\t ]*%s/env/%s-\\)\\(%s\\)\\([\t ]*%s.*$\\)",
+                          efi_no_dots, ns_no_dots, be_no_dots, boot_no_dots);
+
+    if (intret >= REGEX_BUFLEN) {
         return LIBZE_ERROR_MAXPATHLEN;
     }
 
+    if (regcomp(re, reg_buf, 0) != 0) {
+        return LIBZE_ERROR_UNKNOWN;
+    }
+
     return LIBZE_ERROR_SUCCESS;
 }
 
 static libze_error
-form_loader_path(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
-                 const char middle_dir[LIBZE_MAX_PATH_LEN], const char be_name[LIBZE_MAX_PATH_LEN],
+form_loader_path(char const efi_mountpoint[LIBZE_MAX_PATH_LEN],
+                 char const middle_dir[LIBZE_MAX_PATH_LEN], char const be_name[LIBZE_MAX_PATH_LEN],
                  char loader_buf[LIBZE_MAX_PATH_LEN]) {
 
     int ret = snprintf(loader_buf, LIBZE_MAX_PATH_LEN, "%s/%s/%s-%s", efi_mountpoint, middle_dir,
@@ -179,8 +196,8 @@ form_loader_path(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
 }
 
 static libze_error
-form_loader_config(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
-                   const char be_name[LIBZE_MAX_PATH_LEN], char loader_buf[LIBZE_MAX_PATH_LEN]) {
+form_loader_config(char const efi_mountpoint[LIBZE_MAX_PATH_LEN],
+                   char const be_name[LIBZE_MAX_PATH_LEN], char loader_buf[LIBZE_MAX_PATH_LEN]) {
 
     libze_error ret = form_loader_path(efi_mountpoint, "loader/entries", be_name, loader_buf);
     if (ret != LIBZE_ERROR_SUCCESS) {
@@ -195,7 +212,7 @@ form_loader_config(const char efi_mountpoint[LIBZE_MAX_PATH_LEN],
 }
 
 static libze_error
-file_accessible(libze_handle *lzeh, const char unit_buf[LIBZE_MAX_PATH_LEN]) {
+file_accessible(libze_handle *lzeh, char const unit_buf[LIBZE_MAX_PATH_LEN]) {
     /* Check if boot.mount is r/w */
     errno = 0;
     if (access(unit_buf, R_OK | W_OK) != 0) {
@@ -218,192 +235,7 @@ file_accessible(libze_handle *lzeh, const char unit_buf[LIBZE_MAX_PATH_LEN]) {
 }
 
 static libze_error
-copy_matched(libze_handle *lzeh, char unit_buf[LIBZE_MAX_PATH_LEN],
-             char replace_line[LIBZE_MAX_PATH_LEN], regex_t *regexp, int tmpfd) {
-
-    FILE *tmp = fdopen(tmpfd, "w");
-    if (tmp == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to open tempfile fd %d.\n",
-                               tmpfd);
-    }
-
-    FILE *file = fopen(unit_buf, "r");
-    if (file == NULL) {
-        fclose(tmp);
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to open unit file fd %s.\n",
-                               unit_buf);
-    }
-
-    boolean_t matched = B_FALSE;
-    char line_buf[LIBZE_MAX_PATH_LEN];
-
-    while (fgets(line_buf, LIBZE_MAX_PATH_LEN, file)) {
-
-        if (regexec(regexp, line_buf, 0, NULL, 0) == 0) {
-            /* Regex matched */
-            matched = B_TRUE;
-            fwrite(replace_line, 1, strlen(replace_line), tmp);
-            continue;
-        }
-
-        fwrite(line_buf, 1, strlen(line_buf), tmp);
-    }
-
-    fflush(tmp);
-
-    fclose(file);
-    fclose(tmp);
-
-    if (!matched) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                               "Failed find regular expression for %s in boot mount unit.\n",
-                               replace_line);
-    }
-
-    return LIBZE_ERROR_SUCCESS;
-}
-
-/**
- * @brief Using boot mountpoint update .mount unit string
- * @param lzeh               libze handle
- * @param boot_mountpoint    Mountpoint of boot partition
- * @param be_mountpoint      BE mountpoint
- * @return                   @p LIBZE_ERROR_UNKNOWN Boot mountpoint is not set
- *                           @p LIBZE_ERROR_MAXPATHLEN Max path length exceeded
- *                           @p LIBZE_ERROR_SUCCESS On success
- */
-static libze_error
-update_boot_unit(libze_handle *lzeh, libze_activate_data *activate_data,
-                 char boot_mountpoint[LIBZE_MAX_PATH_LEN],
-                 char efi_mountpoint[LIBZE_MAX_PATH_LEN]) {
-    /*
-     * Update mount unit:
-     * Where=/boot
-     * What=/efi/env/<BE>
-     */
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-    int interr = 0;
-
-    char active_be[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Bootfs exceeds max path length.\n");
-    }
-
-    /* Get path to boot.mount */
-    char unit_buf[LIBZE_MAX_PATH_LEN];
-    ret = form_boot_mountpoint_unit(lzeh, boot_mountpoint, activate_data->be_mountpoint, unit_buf);
-    if (ret != LIBZE_ERROR_SUCCESS) {
-        return ret;
-    }
-
-    if ((ret = file_accessible(lzeh, unit_buf)) != LIBZE_ERROR_SUCCESS) {
-        return ret;
-    }
-
-    char new_filename[LIBZE_MAX_PATH_LEN];
-
-    int err = libze_util_concat(unit_buf, ".", "bak", LIBZE_MAX_PATH_LEN, new_filename);
-    if (err != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                               "Backup boot mount unit exceeds max path length.\n");
-    }
-
-    /* backup unit */
-    if ((ret = libze_util_copy_file(unit_buf, new_filename)) != 0) {
-        return ret;
-    }
-
-    /* Setup regular expression */
-    char reg_buf[REGEX_BUFLEN];
-    char suffix[LIBZE_MAX_PATH_LEN];
-    char replace_suffix[LIBZE_MAX_PATH_LEN];
-
-    /* Create 'What=' suffix and replacement suffix */
-    interr = libze_util_concat(efi_mountpoint, "/env/", active_be, LIBZE_MAX_PATH_LEN, suffix);
-    if (interr != 0) {
-        interr = libze_util_concat(efi_mountpoint, "/env/", activate_data->be_name,
-                                   LIBZE_MAX_PATH_LEN, replace_suffix);
-    }
-    if (interr != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                              "Unit EFI path exceeds max path length.\n");
-        goto err;
-    }
-
-    /* Create a regex to find 'What' in boot.mount */
-    ret = form_unit_regex(reg_buf, "What", suffix);
-    if (ret != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Regex exceeds max path length.\n");
-        goto err;
-    }
-    regex_t regexp;
-    interr = regcomp(&regexp, reg_buf, 0);
-    if (interr != 0) {
-        char buf[LIBZE_MAX_ERROR_LEN];
-        (void) regerror(interr, &regexp, buf, LIBZE_MAX_ERROR_LEN);
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Regex %s failed to compile:\n%s\n",
-                              reg_buf, buf);
-        goto err;
-    }
-
-    /* Create a tempfile to manipulate before replacing original */
-    char tmpfile_front[LIBZE_MAX_PATH_LEN];
-    char tmpfile[LIBZE_MAX_PATH_LEN];
-    interr = libze_util_concat(SYSTEMD_SYSTEM_UNIT_PATH, "/", "/.zectl-sdboot.XXXXXX",
-                               LIBZE_MAX_PATH_LEN, tmpfile_front);
-
-    if (interr == 0) {
-        interr = libze_util_concat(activate_data->be_mountpoint, "/", tmpfile_front,
-                                   LIBZE_MAX_PATH_LEN, tmpfile);
-    }
-
-    if (interr != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                              "Temporary boot mount unit exceeds max path length.\n");
-        goto err;
-    }
-
-    /* Create the replacement line */
-    char replace_line[LIBZE_MAX_PATH_LEN];
-    interr = libze_util_concat("What=", replace_suffix, "\n", LIBZE_MAX_PATH_LEN, replace_line);
-    if (interr != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                              "Unit EFI path exceeds max path length.\n");
-        goto err;
-    }
-
-    int fd = mkstemp(tmpfile);
-    if (fd == -1) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to create temporary file\n");
-        goto err;
-    }
-
-    ret = copy_matched(lzeh, unit_buf, replace_line, &regexp, fd);
-    if (ret != LIBZE_ERROR_SUCCESS) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                              "Failed find regular expression for %s in boot mount unit.\n",
-                              replace_line);
-        goto err;
-    }
-
-    errno = 0;
-    /* Use rename for atomicity */
-    interr = rename(tmpfile, unit_buf);
-    if (interr != 0) {
-        // TODO: Better error message from errno
-        remove(tmpfile);
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to replace boot mount unit %s.\n",
-                              unit_buf);
-        goto err;
-    }
-
-err:
-    regfree(&regexp);
-    return ret;
-}
-
-static libze_error
-form_title_regex(regex_t *re, const char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
+form_title_regex(regex_t *re, char const be_name[ZFS_MAX_DATASET_NAME_LEN]) {
 
     char reg_buf[REGEX_BUFLEN];
     libze_error ret = LIBZE_ERROR_SUCCESS;
@@ -422,7 +254,7 @@ form_title_regex(regex_t *re, const char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
 }
 
 static libze_error
-form_linux_regex(regex_t *re, const char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
+form_linux_regex(regex_t *re, char const be_name[ZFS_MAX_DATASET_NAME_LEN]) {
 
     char reg_buf[REGEX_BUFLEN];
 
@@ -458,8 +290,8 @@ form_linux_regex(regex_t *re, const char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
 }
 
 static libze_error
-form_dataset_regex(regex_t *re, const char be_root[LIBZE_MAX_PATH_LEN],
-                   const char be_name[ZFS_MAX_DATASET_NAME_LEN]) {
+form_dataset_regex(regex_t *re, char const be_root[LIBZE_MAX_PATH_LEN],
+                   char const be_name[ZFS_MAX_DATASET_NAME_LEN]) {
 
     char reg_buf[REGEX_BUFLEN];
 
@@ -469,6 +301,7 @@ form_dataset_regex(regex_t *re, const char be_root[LIBZE_MAX_PATH_LEN],
 
     int iret = 0;
 
+    /* Dots must be replaced with \. */
     ret = libze_util_replace_string(".", "\\.", ZFS_MAX_DATASET_NAME_LEN, be_name,
                                     ZFS_MAX_DATASET_NAME_LEN, be_no_dots);
     if (ret != LIBZE_ERROR_SUCCESS) {
@@ -496,29 +329,31 @@ form_dataset_regex(regex_t *re, const char be_root[LIBZE_MAX_PATH_LEN],
 }
 
 static libze_error
-get_line_from_regex(libze_handle *lzeh, const char be_name_active[LIBZE_MAX_PATH_LEN],
-                    const char be_name[LIBZE_MAX_PATH_LEN], const char line[LIBZE_MAX_PATH_LEN],
-                    char replace_line_buf[LIBZE_MAX_PATH_LEN]) {
+get_cfg_line_from_regex(libze_handle *lzeh, void *data, char const line[LIBZE_MAX_PATH_LEN],
+                        char replace_line_buf[LIBZE_MAX_PATH_LEN]) {
+    // TODO: Add errors via lzeh
     libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    struct replace_matched_data *rmd = data;
 
     regmatch_t pmatch;
 
     regex_t re_title_buf, re_linux_buf, re_dataset_buf;
     regex_t *re_title_p = NULL, *re_linux_p = NULL, *re_dataset_p = NULL;
 
-    ret = form_linux_regex(&re_linux_buf, be_name_active);
+    ret = form_linux_regex(&re_linux_buf, rmd->active_be);
     if (ret != LIBZE_ERROR_SUCCESS) {
         goto done;
     }
     re_linux_p = &re_linux_buf;
 
-    ret = form_title_regex(&re_title_buf, be_name_active);
+    ret = form_title_regex(&re_title_buf, rmd->active_be);
     if (ret != LIBZE_ERROR_SUCCESS) {
         goto done;
     }
     re_title_p = &re_title_buf;
 
-    ret = form_dataset_regex(&re_dataset_buf, lzeh->env_root, be_name_active);
+    ret = form_dataset_regex(&re_dataset_buf, lzeh->env_root, rmd->active_be);
     if (ret != LIBZE_ERROR_SUCCESS) {
         goto done;
     }
@@ -527,9 +362,9 @@ get_line_from_regex(libze_handle *lzeh, const char be_name_active[LIBZE_MAX_PATH
     char replace_two[LIBZE_MAX_PATH_LEN] = "";
     char replace_four[LIBZE_MAX_PATH_LEN] = "";
 
-    ret = libze_util_concat("\\1", be_name, "\\3", LIBZE_MAX_PATH_LEN, replace_two);
+    ret = libze_util_concat("\\1", rmd->be_name, "\\3", LIBZE_MAX_PATH_LEN, replace_two);
     if (ret == LIBZE_ERROR_SUCCESS) {
-        ret = libze_util_concat("\\1\\2\\3", be_name, "\\5", LIBZE_MAX_PATH_LEN, replace_four);
+        ret = libze_util_concat("\\1\\2\\3", rmd->be_name, "\\5", LIBZE_MAX_PATH_LEN, replace_four);
     }
     if (ret != LIBZE_ERROR_SUCCESS) {
         goto done;
@@ -574,37 +409,95 @@ done:
     return ret;
 }
 
+static libze_error
+get_fstab_line_from_regex(libze_handle *lzeh, void *data, char const line[LIBZE_MAX_PATH_LEN],
+                          char replace_line_buf[LIBZE_MAX_PATH_LEN]) {
+    // TODO: Add errors via lzeh
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    struct replace_fstab_data *rmd = data;
+
+    regmatch_t pmatch;
+
+    regex_t re_boot_buf;
+    regex_t *re_boot_p = NULL;
+
+    char fstab_re_buf[LIBZE_MAX_PATH_LEN] = "";
+    ret = form_fstab_regex(&re_boot_buf, rmd->boot_mountpoint, rmd->efi_mountpoint, rmd->active_be,
+                           fstab_re_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        goto done;
+    }
+    re_boot_p = &re_boot_buf;
+
+    char replace_two[LIBZE_MAX_PATH_LEN] = "";
+    char replace_four[LIBZE_MAX_PATH_LEN] = "";
+
+    ret = libze_util_concat("\\1", rmd->be_name, "\\3", LIBZE_MAX_PATH_LEN, replace_two);
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        ret = libze_util_concat("\\1\\2\\3", rmd->be_name, "\\5", LIBZE_MAX_PATH_LEN, replace_four);
+    }
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        goto done;
+    }
+
+    if (regexec(re_boot_p, line, 0, &pmatch, 0) == 0) {
+        ret = libze_util_regex_subexpr_replace(re_boot_p, LIBZE_MAX_PATH_LEN, replace_two,
+                                               LIBZE_MAX_PATH_LEN, line, LIBZE_MAX_PATH_LEN,
+                                               replace_line_buf);
+        goto done;
+    }
+
+    if (strlcpy(replace_line_buf, line, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        ret = LIBZE_ERROR_MAXPATHLEN;
+    }
+
+done:
+    if (re_boot_p != NULL) {
+        regfree(re_boot_p);
+    }
+
+    return ret;
+}
+
 /**
- * @brief TODO
- * @param lzeh
- * @param filename
- * @param filename_new
- * @param be_name
- * @param regexp
- * @return
+ * @brief Loop over each line of a file replacing each line according to a regular expression.
+ *        The file at @p filename_new will be erased upon opening.
+ *
+ * @param lzeh            libze handle
+ * @param be_name         New boot environment
+ * @param be_name_active  Active boot environment
+ * @param filename        Old configuration file
+ * @param new_filename    New configuration file
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN on buffer length being exceeded
  */
 static libze_error
-replace_matched(libze_handle *lzeh, const char filename[LIBZE_MAX_PATH_LEN],
-                const char filename_new[LIBZE_MAX_PATH_LEN], const char be_name[LIBZE_MAX_PATH_LEN],
-                const char be_name_active[LIBZE_MAX_PATH_LEN]) {
+replace_matched(libze_handle *lzeh, char const filename[LIBZE_MAX_PATH_LEN],
+                char const filename_new[LIBZE_MAX_PATH_LEN], line_replace_fn replace_fn,
+                void *data) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
+    char *open_err = "Failed to open %s.\n";
+
     FILE *file_new = fopen(filename_new, "w+");
     if (file_new == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to open %s.\n", file_new);
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, open_err, file_new);
     }
 
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         fclose(file_new);
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to open %s.\n", filename);
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, open_err, filename);
     }
 
     char line_buf[LIBZE_MAX_PATH_LEN];
     char replace_line_buf[LIBZE_MAX_PATH_LEN] = "";
     while (fgets(line_buf, LIBZE_MAX_PATH_LEN, file)) {
-        ret = get_line_from_regex(lzeh, be_name_active, be_name, line_buf, replace_line_buf);
+        /* Get the new line to be written out according to a regular expression
+           If there's no match, original line will be in replace_line_buf */
+        ret = replace_fn(lzeh, data, line_buf, replace_line_buf);
         if (ret != LIBZE_ERROR_SUCCESS) {
             goto err;
         }
@@ -621,21 +514,27 @@ err:
 }
 
 /**
- * @brief TODO
- * @param lzeh
- * @param activate_data
- * @param active_be
- * @param filename
- * @return
+ * @brief Replace a boot environment name in an old configuration file writing out the
+ *        changes to a new configuration file.
+ *
+ * @param lzeh         libze handle
+ * @param be_name      New boot environment
+ * @param active_be    Active boot environment
+ * @param filename     Old configuration file
+ * @param new_filename New configuration file
+ *
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN on buffer being exceeded,
+ *         @p LIBZE_ERROR_EPERM upon missing permissions to open file,
+ *         @p LIBZE_ERROR_UNKNOWN upon file could not be accessed
  */
 static libze_error
-replace_be_name(libze_handle *lzeh, const char be_name[ZFS_MAX_DATASET_NAME_LEN],
-                const char active_be[ZFS_MAX_DATASET_NAME_LEN],
-                const char filename[LIBZE_MAX_PATH_LEN],
-                const char new_filename[LIBZE_MAX_PATH_LEN]) {
+replace_be_name(libze_handle *lzeh, char const be_name[ZFS_MAX_DATASET_NAME_LEN],
+                char const active_be[ZFS_MAX_DATASET_NAME_LEN],
+                char const filename[LIBZE_MAX_PATH_LEN],
+                char const new_filename[LIBZE_MAX_PATH_LEN]) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
-    int interr = 0;
 
     if ((ret = file_accessible(lzeh, filename)) != LIBZE_ERROR_SUCCESS) {
         return ret;
@@ -647,26 +546,97 @@ replace_be_name(libze_handle *lzeh, const char be_name[ZFS_MAX_DATASET_NAME_LEN]
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Regex exceeds max path length.\n");
     }
 
-    regex_t regexp;
-    interr = regcomp(&regexp, reg_buf, 0);
+    struct replace_matched_data data = {.be_name = be_name, .active_be = active_be};
+
+    ret = replace_matched(lzeh, filename, new_filename, get_cfg_line_from_regex, &data);
+
+    return ret;
+}
+
+/**
+ * @brief Using boot mountpoint update fstab
+ *
+ * @param lzeh               libze handle
+ * @param boot_mountpoint    Mountpoint of boot partition
+ * @param be_mountpoint      BE mountpoint
+ * @param efi_mountpoint      EFI mountpoint
+ * @return                   @p LIBZE_ERROR_UNKNOWN Boot mountpoint is not set
+ *                           @p LIBZE_ERROR_MAXPATHLEN Max path length exceeded
+ *                           @p LIBZE_ERROR_SUCCESS On success
+ */
+static libze_error
+update_fstab(libze_handle *lzeh, libze_activate_data *activate_data,
+             char const boot_mountpoint[LIBZE_MAX_PATH_LEN],
+             char const efi_mountpoint[LIBZE_MAX_PATH_LEN]) {
+
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+    int interr = 0;
+
+    char active_be[ZFS_MAX_DATASET_NAME_LEN];
+    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Bootfs exceeds max path length.\n");
+    }
+
+    /* Get path to fstab */
+    char fstab_buf[LIBZE_MAX_PATH_LEN] = "";
+    if ((strlcpy(fstab_buf, activate_data->be_mountpoint, LIBZE_MAX_PATH_LEN) >=
+         LIBZE_MAX_PATH_LEN) ||
+        (strlcat(fstab_buf, "/etc/fstab", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "fstab exceeds max path length (%s).\n", LIBZE_MAX_PATH_LEN);
+    }
+
+    if ((ret = file_accessible(lzeh, fstab_buf)) != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    char new_filename[LIBZE_MAX_PATH_LEN];
+    int err = libze_util_concat(fstab_buf, ".", "bak", LIBZE_MAX_PATH_LEN, new_filename);
+    if (err != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "Backup fstab exceeds max path length.\n");
+    }
+
+    /* backup unit */
+    if ((ret = libze_util_copy_file(fstab_buf, new_filename)) != 0) {
+        return ret;
+    }
+
+    /* Create a tempfile to manipulate before replacing original */
+    char tmpfile[LIBZE_MAX_PATH_LEN];
+    interr = libze_util_concat(fstab_buf, ".", ".zectl-sdboot.XXXXXX", LIBZE_MAX_PATH_LEN, tmpfile);
+
     if (interr != 0) {
-        char buf[LIBZE_MAX_ERROR_LEN];
-        (void) regerror(interr, &regexp, buf, LIBZE_MAX_ERROR_LEN);
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Regex %s failed to compile:\n%s\n",
-                              reg_buf, buf);
-        goto err;
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "Temporary boot mount unit exceeds max path length.\n");
     }
 
-    // TODO:
-    ret = replace_matched(lzeh, filename, new_filename, be_name, active_be);
+    int fd = mkstemp(tmpfile);
+    if (fd == -1) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to create temporary file\n");
+    }
+
+    struct replace_fstab_data data = {.active_be = active_be,
+                                      .be_name = activate_data->be_name,
+                                      .boot_mountpoint = boot_mountpoint,
+                                      .efi_mountpoint = efi_mountpoint};
+
+    ret = replace_matched(lzeh, fstab_buf, tmpfile, get_fstab_line_from_regex, &data);
     if (ret != LIBZE_ERROR_SUCCESS) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to replace %s in %s.\n", be_name,
-                              filename);
-        goto err;
+        remove(tmpfile);
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to replace lines in %s.\n",
+                               tmpfile);
     }
 
-err:
-    regfree(&regexp);
+    errno = 0;
+    /* Use rename for atomicity */
+    interr = rename(tmpfile, fstab_buf);
+    if (interr != 0) {
+        // TODO: Better error message from errno
+        remove(tmpfile);
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to replace %s.\n", fstab_buf);
+    }
+
     return ret;
 }
 
@@ -703,10 +673,7 @@ libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, libze_activate_data *a
                                "Couldn't access systemdboot:efi property.\n");
     }
 
-    ret = update_boot_unit(lzeh, activate_data, boot_mountpoint, efi_mountpoint);
-    if (ret != LIBZE_ERROR_SUCCESS) {
-        return ret;
-    }
+    ret = update_fstab(lzeh, activate_data, boot_mountpoint, efi_mountpoint);
 
     return ret;
 }
@@ -717,7 +684,7 @@ libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, libze_activate_data *a
  * @return Non @p LIBZE_ERROR_SUCCESS on failure
  */
 libze_error
-libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]) {
+libze_plugin_systemdboot_post_activate(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]) {
     /*
      * Steps:
      *   - Copy <esp>/loader/entries/<prefix>-<oldbe>.conf -> <prefix>-<be>.conf
@@ -796,7 +763,7 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, const char be_name[LI
 }
 
 libze_error
-libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, const char be_name[LIBZE_MAX_PATH_LEN]) {
+libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]) {
     puts("sd_post_destroy");
 
     return 0;
