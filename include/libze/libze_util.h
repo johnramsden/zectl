@@ -22,56 +22,51 @@
 #endif
 
 int
-libze_util_concat(const char *prefix, const char *separator, const char *suffix, size_t buflen,
+libze_util_concat(char const *prefix, char const *separator, char const *suffix, size_t buflen,
                   char buf[buflen]);
 
 int
-libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char delimiter);
+libze_util_cut(char const path[static 1], size_t buflen, char buf[buflen], char delimiter);
 
 int
-libze_util_suffix_after_string(const char root[static 1], const char dataset[static 1],
+libze_util_suffix_after_string(char const root[static 1], char const dataset[static 1],
                                size_t buflen, char buf[buflen]);
 
 int
 libze_get_root_dataset(libze_handle *lzeh);
 
 int
-libze_get_zpool_name_from_dataset(const char dataset[static 3], size_t buflen, char buf[buflen]);
+libze_get_zpool_name_from_dataset(char const dataset[static 3], size_t buflen, char buf[buflen]);
 
 boolean_t
-libze_is_active_be(libze_handle *lzeh, const char be[static 1]);
+libze_is_active_be(libze_handle *lzeh, char const be[static 1]);
 
 boolean_t
-libze_is_root_be(libze_handle *lzeh, const char be[static 1]);
+libze_is_root_be(libze_handle *lzeh, char const be[static 1]);
 
 libze_error
-libze_util_open_boot_environment(libze_handle *lzeh, const char be[static 1], zfs_handle_t **be_zh,
-                                 char be_ds[ZFS_MAX_DATASET_NAME_LEN], zfs_handle_t **be_bpool_zh,
-                                 char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN]);
-
-libze_error
-libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN],
-                           const char mountpoint[static 2]);
+libze_util_temporary_mount(char const dataset[ZFS_MAX_DATASET_NAME_LEN],
+                           char const mountpoint[static 2]);
 
 void
 libze_list_free(nvlist_t *nvl);
 
 int
-libze_util_copy_file(const char *filename, const char *new_filename);
+libze_util_copy_file(char const *filename, char const *new_filename);
 
 int
-libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
-                   const char new_directory_path[LIBZE_MAX_PATH_LEN]);
+libze_util_copydir(char const directory_path[LIBZE_MAX_PATH_LEN],
+                   char const new_directory_path[LIBZE_MAX_PATH_LEN]);
 
 libze_error
-libze_util_replace_string(const char *to_replace, const char *replacement, size_t line_length,
-                          const char line[line_length], size_t line_replaced_length,
+libze_util_replace_string(char const *to_replace, char const *replacement, size_t line_length,
+                          char const line[line_length], size_t line_replaced_length,
                           char line_replaced[line_replaced_length]);
 
 libze_error
 libze_util_regex_subexpr_replace(regex_t *re, size_t replace_buflen,
-                                 const char replace[replace_buflen], size_t input_buflen,
-                                 const char input[input_buflen], size_t output_buflen,
+                                 char const replace[replace_buflen], size_t input_buflen,
+                                 char const input[input_buflen], size_t output_buflen,
                                  char output[output_buflen]);
 
 #endif // ZECTL_LIBZE_UTIL_H

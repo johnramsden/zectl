@@ -33,7 +33,7 @@ typedef struct libze_handle libze_handle;
 typedef struct libze_plugin_fn_export libze_plugin_fn_export;
 
 /**
- * @struct
+ * @struct libze_bootpool
  * @brief A struct that stores the zfs handle to a separate boot pool and the user specified
  * properties of the root path and prefix in case that the system is setup to use a separate boot
  * pool.

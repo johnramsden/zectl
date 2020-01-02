@@ -521,14 +521,29 @@ err:
     return ret;
 }
 
+/**
+ * @brief Replace a string based on a regular expression and sub expression.
+ *        Does nothing on no match.
+ *
+ * @param[in] re              Regular expression to match
+ * @param[in] replace_buflen  Length of @p replace
+ * @param[in] replace         Sub expression to replace with
+ * @param[in] input_buflen    Length of @p input
+ * @param[in] input           Input string to apply regular expression to
+ * @param[in] output_buflen   Length of @p output
+ * @param[out] output         Buffer containing modified string (or input on no match)
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN if @p output_buflen exceeded,
+ *         @p LIBZE_ERROR_UNKNOWN if replacing subexpression fails
+ */
 libze_error
 libze_util_regex_subexpr_replace(regex_t *re, size_t replace_buflen,
-                                 const char replace[replace_buflen], size_t input_buflen,
-                                 const char input[input_buflen], size_t output_buflen,
+                                 char const replace[replace_buflen], size_t input_buflen,
+                                 char const input[input_buflen], size_t output_buflen,
                                  char output[output_buflen]) {
     char *pos;
-    int so;
-    int n;
+    int start_offset;
+    int len;
 
     if (strlcpy(output, replace, replace_buflen) >= output_buflen) {
         return LIBZE_ERROR_MAXPATHLEN;
@@ -547,14 +562,17 @@ libze_util_regex_subexpr_replace(regex_t *re, size_t replace_buflen,
         char next_char = *(pos + 1);
         if (next_char > '0' && next_char <= '9') {
             int match_index = next_char - ASCII_OFFSET;
-            so = pmatch[match_index].rm_so;
-            n = pmatch[match_index].rm_eo - so;
-            if (so < 0 || strlen(output) + n - 1 > output_buflen) {
+            start_offset = pmatch[match_index].rm_so;
+            len = pmatch[match_index].rm_eo - start_offset;
+            if (start_offset < 0) {
                 return LIBZE_ERROR_UNKNOWN;
             }
-            memmove(pos + n, pos + 2, strlen(pos) - 1);
-            memmove(pos, input + so, n);
-            pos = pos + n - 2;
+            if ((strlen(output) + len - 1) > output_buflen) {
+                return LIBZE_ERROR_MAXPATHLEN;
+            }
+            memmove(pos + len, pos + 2, strlen(pos) - 1);
+            memmove(pos, input + start_offset, len);
+            pos = pos + len - 2;
         }
     }
 
