@@ -28,14 +28,14 @@ ze_mount(libze_handle *lzeh, int argc, char **argv) {
         return LIBZE_ERROR_UNKNOWN;
     }
 
-    const char *mountpoint;
+    char const *mountpoint;
     if (argc == 2) {
         mountpoint = argv[1];
     } else {
         mountpoint = NULL;
     }
 
-    const char *boot_environment = argv[0];
+    char const *boot_environment = argv[0];
     char mountpoint_buffer[LIBZE_MAX_PATH_LEN];
     if ((ret = libze_mount(lzeh, boot_environment, mountpoint, mountpoint_buffer)) ==
         LIBZE_ERROR_SUCCESS) {

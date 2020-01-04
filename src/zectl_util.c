@@ -3,7 +3,7 @@
 #include <string.h>
 
 int
-set_column_width(size_t *width_column, const char *string_prop) {
+set_column_width(size_t *width_column, char const *string_prop) {
     size_t item_width;
     item_width = strlen(string_prop);
     if (item_width > *width_column) {

@@ -24,7 +24,7 @@ libze_dataset_from_mountpoint(char mountpoint[static 1], size_t buflen, char dat
     struct mntent *ent = NULL;
     system_fs_error ret = SYSTEM_ERR_SUCCESS;
 
-    const char *mnt_location_file = "/proc/mounts";
+    char const *mnt_location_file = "/proc/mounts";
     FILE *mnt_file = setmntent(mnt_location_file, "r");
 
     if (mnt_file == NULL) {

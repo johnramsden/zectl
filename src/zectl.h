@@ -6,7 +6,7 @@
 
 #define HEADER_SPACING 2
 
-extern const char *ZE_PROGRAM;
+extern char const *ZE_PROGRAM;
 
 void
 ze_usage(void);
