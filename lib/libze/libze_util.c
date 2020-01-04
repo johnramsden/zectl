@@ -17,15 +17,17 @@
 
 /**
  * @brief Concatenate two strings with a separator
- * @param[in] prefix Prefix string
- * @param[in] separator Separator string
- * @param[in] suffix Suffix string
- * @param[in] buflen Length of buffer
- * @param[out] buf Resulting concatenated string
+ *
+ * @param[in] prefix     Prefix string
+ * @param[in] separator  Separator string
+ * @param[in] suffix     Suffix string
+ * @param[in] buflen     Length of buffer
+ * @param[out] buf       Resulting concatenated string
+ *
  * @return Nonzero if the resulting string is longer than the buffer length
  */
 int
-libze_util_concat(const char *prefix, const char *separator, const char *suffix, size_t buflen,
+libze_util_concat(char const *prefix, char const *separator, char const *suffix, size_t buflen,
                   char buf[buflen]) {
 
     (void) strlcpy(buf, "", buflen);
@@ -40,14 +42,16 @@ libze_util_concat(const char *prefix, const char *separator, const char *suffix,
 
 /**
  * @brief Cut a string at the last instance of a delimiter
- * @param[in] path String to cut
- * @param[in] buflen Length of buffer
- * @param[out] buf  Prefix before last instance of delimiter
- * @param[in] delimiter Delimiter to cut string at
- * @return Nonzero if buffer is too short, or there is no instance of delimiter
+ *
+ * @param[in] path       String to cut
+ * @param[in] buflen     Length of buffer
+ * @param[out] buf       Prefix before last instance of delimiter
+ * @param[in] delimiter  Delimiter to cut string at
+ *
+ * @return Non-zero if buffer is too short, or there is no instance of delimiter
  */
 int
-libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char delimiter) {
+libze_util_cut(char const path[static 1], size_t buflen, char buf[buflen], char delimiter) {
     char *slashp = NULL;
 
     if (strlcpy(buf, path, buflen) >= buflen) {
@@ -66,15 +70,17 @@ libze_util_cut(const char path[static 1], size_t buflen, char buf[buflen], char 
 
 /**
  * @brief Given a dataset, return just the portion after the root of boot environments
- * @param[in] root Root of boot environments
- * @param[in] dataset Full dataset to get suffix of
- * @param[in] buflen Length of buffer
- * @param[out] buf Buffer to place suffix in
+ *
+ * @param[in] root     Root of boot environments
+ * @param[in] dataset  Full dataset to get suffix of
+ * @param[in] buflen   Length of buffer
+ * @param[out] buf     Buffer to place suffix in
+ *
  * @return Non-zero if there is no parent (path is just the name of the pool),
  *         or if the length of the buffer is exceeded
  */
 int
-libze_util_suffix_after_string(const char root[static 1], const char dataset[static 1],
+libze_util_suffix_after_string(char const root[static 1], char const dataset[static 1],
                                size_t buflen, char buf[buflen]) {
 
     if (strlcpy(buf, dataset, buflen) >= buflen) {
@@ -96,14 +102,16 @@ libze_util_suffix_after_string(const char root[static 1], const char dataset[sta
 
 /**
  * @brief Given a dataset, get the name of the boot environment
- * @param[in] dataset Dataset to get the boot environment of
- * @param[in] buflen Length of buffer
- * @param[out] buf Buffer to place boot environment in
+ *
+ * @param[in] dataset  Dataset to get the boot environment of
+ * @param[in] buflen   Length of buffer
+ * @param[out] buf     Buffer to place boot environment in
+ *
  * @return Non-zero if the length of the buffer is exceeded,
  *         or if there is no / contained in the data set
  */
 int
-libze_boot_env_name(const char *dataset, size_t buflen, char buf[buflen]) {
+libze_boot_env_name(char const *dataset, size_t buflen, char buf[buflen]) {
     char *slashp = NULL;
 
     if (strlcpy(buf, dataset, buflen) >= buflen) {
@@ -125,37 +133,42 @@ libze_boot_env_name(const char *dataset, size_t buflen, char buf[buflen]) {
 
 /**
  * @brief Check if the specified boot environment is set as active
- * @param[in] lzeh Initialized @p libze_handle
- * @param[in] be Dataset or name of a boot environment to check
+ *
+ * @param[in] lzeh  Initialized @p libze_handle
+ * @param[in] be    Dataset or name of a boot environment to check
+ *
  * @return @p B_TRUE if active, else @p B_FALSE
  */
 boolean_t
-libze_is_active_be(libze_handle *lzeh, const char be[static 1]) {
+libze_is_active_be(libze_handle *lzeh, char const be[static 1]) {
     if (strchr(be, '/') == NULL) {
         return ((strcmp(lzeh->env_activated, be) == 0) ? B_TRUE : B_FALSE);
-    } else {
-        return ((strcmp(lzeh->env_activated_path, be) == 0) ? B_TRUE : B_FALSE);
     }
+
+    return ((strcmp(lzeh->env_activated_path, be) == 0) ? B_TRUE : B_FALSE);
 }
 
 /**
  * @brief Check if the specified boot environment is currently running.
- * @param[in] lzeh Initialized @p libze_handle
- * @param[in] be Dataset or name of a boot environment to check
+ *
+ * @param[in] lzeh  Initialized @p libze_handle
+ * @param[in] be    Dataset or name of a boot environment to check
+ *
  * @return @p B_TRUE if running, else @p B_FALSE
  */
 boolean_t
-libze_is_root_be(libze_handle *lzeh, const char be[static 1]) {
+libze_is_root_be(libze_handle *lzeh, char const be[static 1]) {
     if (strchr(be, '/') == NULL) {
         return ((strcmp(lzeh->env_running, be) == 0) ? B_TRUE : B_FALSE);
-    } else {
-        return ((strcmp(lzeh->env_running_path, be) == 0) ? B_TRUE : B_FALSE);
     }
+
+    return ((strcmp(lzeh->env_running_path, be) == 0) ? B_TRUE : B_FALSE);
 }
 
 /**
  * @brief Free an nvlist and one level down of it's children
- * @param[in] nvl nvlist to free
+ *
+ * @param[in] nvl  nvlist to free
  */
 void
 libze_list_free(nvlist_t *nvl) {
@@ -175,7 +188,9 @@ libze_list_free(nvlist_t *nvl) {
 
 /**
  * @brief Get the root dataset
- * @param[in] lzeh Initialized @p libze_handle
+ *
+ * @param[in] lzeh  Initialized @p libze_handle
+ *
  * @return Zero on success
  *
  * @pre lzeh != NULL
@@ -214,12 +229,14 @@ libze_get_root_dataset(libze_handle *lzeh) {
 
 /**
  * @brief Returns the name of the ZFS pool from the specified dataset (everything to first '/')
- * @param[in] buflen Length of buffer
- * @param[out] buf Buffer to place boot environment in
+ *
+ * @param[in] buflen  Length of buffer
+ * @param[out] buf    Buffer to place boot environment in
+ *
  * @return Zero on success
  */
 int
-libze_get_zpool_name_from_dataset(const char dataset[static 3], size_t buflen, char buf[buflen]) {
+libze_get_zpool_name_from_dataset(char const dataset[static 3], size_t buflen, char buf[buflen]) {
     if (buflen > 0) {
         if (dataset[0] == '/') {
             return -1;
@@ -235,11 +252,19 @@ libze_get_zpool_name_from_dataset(const char dataset[static 3], size_t buflen, c
     return -1;
 }
 
+/**
+ * @brief Mount dataset temporarily using zfsutil
+ *
+ * @param[in] dataset     Dataset to mount
+ * @param[in] mountpoint  Mountpoint location
+ *
+ * @return @p LIBZE_ERROR_SUCCESS on success, @p LIBZE_ERROR_UNKNOWN on failure
+ */
 libze_error
-libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN],
-                           const char mountpoint[static 2]) {
-    const char *mount_settings = "zfsutil";
-    const char *mount_type = "zfs";
+libze_util_temporary_mount(char const dataset[ZFS_MAX_DATASET_NAME_LEN],
+                           char const mountpoint[static 2]) {
+    char const *mount_settings = "zfsutil";
+    char const *mount_type = "zfs";
     const unsigned long mount_flags = 0;
 
     if (mount(dataset, mountpoint, mount_type, mount_flags, mount_settings) != 0) {
@@ -251,15 +276,14 @@ libze_util_temporary_mount(const char dataset[ZFS_MAX_DATASET_NAME_LEN],
 
 /**
  * @brief Copy binary file into new binary file
- * @param file Original file (rb)
- * @param new_file New file (wb)
- * @return 0 on success else appropriate error as returned by errno
+ *
+ * @param[in] file      Original file (rb)
+ * @param[in] new_file  New file (wb)
+ *
+ * @return 0 on success else appropriate error as returned by @p errno
  */
 static int
-libze_util_copy_filepointer(FILE *file, FILE *new_file) {
-    assert(file != NULL);
-    assert(new_file != NULL);
-
+libze_util_copy_filepointer(FILE file[static 1], FILE new_file[static 1]) {
     errno = 0;
     char buf[COPY_BUFLEN];
 
@@ -284,12 +308,14 @@ libze_util_copy_filepointer(FILE *file, FILE *new_file) {
 
 /**
  * @brief Copy binary file into new file
+ *
  * @param file Original filename
  * @param new_file New filename
+ *
  * @return 0 on success else appropriate error as returned by errno
  */
 int
-libze_util_copy_file(const char *filename, const char *new_filename) {
+libze_util_copy_file(char const *filename, char const *new_filename) {
     FILE *file = NULL;
     FILE *new_file = NULL;
 
