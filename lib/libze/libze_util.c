@@ -348,8 +348,8 @@ err:
  * @brief Prototype for recursive_traverse callback
  */
 typedef int (*traverse_cb)(char const dirname[LIBZE_MAX_PATH_LEN],
-                           char const filename_suffix[LIBZE_MAX_PATH_LEN],
-                           struct stat *st, void *data);
+                           char const filename_suffix[LIBZE_MAX_PATH_LEN], struct stat *st,
+                           void *data);
 
 /**
  * @brief Recursive directory traversal function.
@@ -407,7 +407,7 @@ recursive_traverse(char const directory_path[LIBZE_MAX_PATH_LEN], traverse_cb cb
         }
 
         /* call cb */
-        if ((ret = cb(directory_path, buf, &st,  data) != 0)) {
+        if ((ret = cb(directory_path, buf, &st, data) != 0)) {
             goto done;
         }
 
@@ -536,9 +536,7 @@ copy_cb(char const dirname[LIBZE_MAX_PATH_LEN], char const filename_suffix[LIBZE
         }
 
         /* path is directory, recurse */
-        return recursive_traverse(path_to_item, copy_cb, &(struct copy_data){
-            .dest = new_path
-        });
+        return recursive_traverse(path_to_item, copy_cb, &(struct copy_data){.dest = new_path});
     }
 
     if (S_ISREG(st->st_mode)) {
