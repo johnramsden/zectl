@@ -1799,6 +1799,11 @@ libze_create(libze_handle *lzeh, libze_create_options *options) {
         }
     }
 
+    if ((lzeh->lz_funcs != NULL) &&
+        (lzeh->lz_funcs->plugin_post_create(lzeh, options->be_name) != LIBZE_ERROR_SUCCESS)) {
+        return lzeh->libze_error;
+    }
+
     return LIBZE_ERROR_SUCCESS;
 }
 

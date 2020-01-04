@@ -3,7 +3,7 @@
 
 #include "libze/libze_plugin_manager.h"
 
-const char *PLUGIN_SYSTEMDBOOT = "systemdboot";
+char const *PLUGIN_SYSTEMDBOOT = "systemdboot";
 
 libze_error
 libze_plugin_systemdboot_init(libze_handle *lzeh);
@@ -20,11 +20,15 @@ libze_plugin_systemdboot_post_activate(libze_handle *lzeh, char const be_name[LI
 libze_error
 libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]);
 
-libze_plugin_fn_export exported_plugin = {
+libze_error
+libze_plugin_systemdboot_post_create(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]);
+
+libze_plugin_fn_export const exported_plugin = {
     .plugin_init = libze_plugin_systemdboot_init,
     .plugin_pre_activate = libze_plugin_systemdboot_pre_activate,
     .plugin_mid_activate = libze_plugin_systemdboot_mid_activate,
     .plugin_post_activate = libze_plugin_systemdboot_post_activate,
-    .plugin_post_destroy = libze_plugin_systemdboot_post_destroy};
+    .plugin_post_destroy = libze_plugin_systemdboot_post_destroy,
+    .plugin_post_create = libze_plugin_systemdboot_post_create};
 
 #endif // ZECTL_LIBZE_PLUGIN_SYSTEMDBOOT_H

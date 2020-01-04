@@ -25,10 +25,13 @@ typedef libze_error (*plugin_fn_mid_activate)(libze_handle *lzeh,
                                               libze_activate_data *activate_data);
 
 typedef libze_error (*plugin_fn_post_activate)(libze_handle *lzeh,
-                                               const char be_name[LIBZE_MAX_PATH_LEN]);
+                                               char const be_name[LIBZE_MAX_PATH_LEN]);
 
 typedef libze_error (*plugin_fn_post_destroy)(libze_handle *lzeh,
-                                              const char be_name[LIBZE_MAX_PATH_LEN]);
+                                              char const be_name[LIBZE_MAX_PATH_LEN]);
+
+typedef libze_error (*plugin_fn_post_create)(libze_handle *lzeh,
+                                             char const be_name[LIBZE_MAX_PATH_LEN]);
 
 typedef struct libze_plugin_fn_export {
     plugin_fn_init plugin_init;
@@ -36,6 +39,7 @@ typedef struct libze_plugin_fn_export {
     plugin_fn_mid_activate plugin_mid_activate;
     plugin_fn_post_activate plugin_post_activate;
     plugin_fn_post_destroy plugin_post_destroy;
+    plugin_fn_post_create plugin_post_create;
 } libze_plugin_fn_export;
 
 libze_plugin_manager_error
