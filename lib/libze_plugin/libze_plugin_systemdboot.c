@@ -1247,7 +1247,6 @@ remove_kernels(libze_handle *lzeh, char const efi_mountpoint[LIBZE_MAX_PATH_LEN]
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to remove %s.\n", loader_buf);
     }
 
-    errno = 0;
     interr = libze_util_rmdir(kernels_buf);
     if (interr != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to remove %s.\n", kernels_buf);
@@ -1256,6 +1255,19 @@ remove_kernels(libze_handle *lzeh, char const efi_mountpoint[LIBZE_MAX_PATH_LEN]
     return ret;
 }
 
+/**
+ * @brief Post-destroy hook
+ *        Removes loader entry
+ *        Deletes kernels from BE being destroyed
+ *
+ * @param[in,out] lzeh  libze handle
+ * @param[in] be_name   BE being destroyed
+ *
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN on buffer being exceeded,
+ *         @p LIBZE_ERROR_UNKNOWN upon file deletion failure,
+ *         @p LIBZE_ERROR_UNKNOWN if couldn't access a property,
+ */
 libze_error
 libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]) {
 
@@ -1266,21 +1278,15 @@ libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char const be_name[LIB
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Bootfs exceeds max path length.\n");
     }
 
-    char boot_mountpoint[ZFS_MAXPROPLEN];
     char efi_mountpoint[ZFS_MAXPROPLEN];
-
     char namespace_buf[ZFS_MAXPROPLEN];
-    if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf) !=
-        LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
+
+    libze_plugin_manager_error per = libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf);
+    if (per != LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                                "Exceeded max property name length.\n");
     }
 
-    ret = libze_be_prop_get(lzeh, boot_mountpoint, "boot", namespace_buf);
-    if (ret != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                               "Couldn't access systemdboot:boot property.\n");
-    }
     ret = libze_be_prop_get(lzeh, efi_mountpoint, "efi", namespace_buf);
     if (ret != LIBZE_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
