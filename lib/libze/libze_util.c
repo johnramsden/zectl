@@ -318,21 +318,89 @@ err:
     return ret;
 }
 
-/**
- * @brief Copy a directory recursively
- * @param directory_path Directory to copy
- * @param new_directory_path Destination to copy to
- * @return 0 on success else appropriate error as returned by errno
- */
-int
-libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
-                   const char new_directory_path[LIBZE_MAX_PATH_LEN]) {
-    DIR *directory = NULL;
-    DIR *new_directory = NULL;
+struct copy_data {
+    char const *location;
+};
+
+typedef int (*traverse_cb)(char const dirname[LIBZE_MAX_PATH_LEN],
+                           char const filename[LIBZE_MAX_PATH_LEN], void *data);
+
+static int
+rmdir_cb(char const dirname[LIBZE_MAX_PATH_LEN], char const filename_suffix[LIBZE_MAX_PATH_LEN],
+         void *data) {
+
+    (void) data;
+
     char path[LIBZE_MAX_PATH_LEN];
+    /* Copy current path into path */
+    if ((strlcpy(path, dirname, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+        (strlcat(path, filename_suffix, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+        return ENAMETOOLONG;
+    }
+
+    errno = 0;
+    if (remove(path) != 0) {
+        return errno;
+    }
+
+    return 0;
+}
+
+static int
+copy_cb(char const dirname[LIBZE_MAX_PATH_LEN], char const filename_suffix[LIBZE_MAX_PATH_LEN],
+        void *data) {
+
+    struct copy_data *cd = data;
+    struct stat st;
+
+    DIR *new_directory = NULL;
     char new_path[LIBZE_MAX_PATH_LEN];
+
+    int ret = 0;
+
+    /* Check error after for TOCTOU race condition */
+    int err = mkdir(cd->location, 0700);
+    if (err != 0) {
+        errno = 0;
+        if (stat(cd->location, &st) != 0) {
+            return errno;
+        }
+
+        if (!S_ISDIR(st.st_mode)) {
+            return ENOTDIR;
+        }
+    }
+
+    errno = 0;
+    new_directory = opendir(cd->location);
+    if (new_directory == NULL) {
+        return errno;
+    }
+
+    char path[LIBZE_MAX_PATH_LEN];
+    /* Copy current path into path */
+    if ((strlcpy(path, dirname, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+        (strlcat(path, filename_suffix, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+        return ENAMETOOLONG;
+    }
+
+    if ((strlcpy(new_path, cd->location, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
+        (strlcat(new_path, filename_suffix, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+        return ENAMETOOLONG;
+    }
+
+    if ((ret = libze_util_copy_file(path, new_path) != 0)) {
+        return ret;
+    }
+
+    return 0;
+}
+
+static int
+recursive_traverse(char const directory_path[LIBZE_MAX_PATH_LEN], traverse_cb cb, void *data) {
+    DIR *directory = NULL;
+    char path[LIBZE_MAX_PATH_LEN];
     char *fin = path;
-    char *new_fin = new_path;
     struct dirent *de;
     struct stat st;
 
@@ -344,36 +412,13 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
         return errno;
     }
 
-    /* Check error after for TOCTOU race condition */
-    int err = mkdir(new_directory_path, 0700);
-    if (err != 0) {
-        errno = 0;
-        if (stat(new_directory_path, &st) != 0) {
-            return errno;
-        }
-
-        if (!S_ISDIR(st.st_mode)) {
-            return ENOTDIR;
-        }
-    }
-
-    errno = 0;
-    new_directory = opendir(new_directory_path);
-    if (new_directory == NULL) {
-        return errno;
-    }
-
     /* Copy current path into path */
     if (strlcpy(path, directory_path, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
-        return ENAMETOOLONG;
-    }
-    if (strlcpy(new_path, new_directory_path, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
         return ENAMETOOLONG;
     }
 
     /* Move the fin to end of string */
     fin += strlen(directory_path);
-    new_fin += strlen(new_directory_path);
 
     while ((de = readdir(directory)) != NULL) {
 
@@ -385,8 +430,7 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
             return ENAMETOOLONG;
         }
 
-        if ((strlcpy(fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) ||
-            (strlcpy(new_fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
+        if (strlcpy(fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
             return ENAMETOOLONG;
         }
 
@@ -401,14 +445,14 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
             }
 
             /* path is directory, recurse */
-            if ((ret = libze_util_copydir(path, new_directory_path)) != 0) {
+            if ((ret = recursive_traverse(path, cb, data)) != 0) {
                 return ret;
             }
         }
 
         if (S_ISREG(st.st_mode)) {
             /* path is file, copy */
-            if ((ret = libze_util_copy_file(path, new_path) != 0)) {
+            if ((ret = cb(directory_path, buf, data) != 0)) {
                 return ret;
             }
         }
@@ -417,6 +461,43 @@ libze_util_copydir(const char directory_path[LIBZE_MAX_PATH_LEN],
     }
 
     return 0;
+}
+
+/**
+ * @brief Remove a directory recursively
+ *
+ * @param directory_path Directory to remove
+ * @return 0 on success else appropriate error as returned by errno
+ */
+int
+libze_util_rmdir(char const directory_path[LIBZE_MAX_PATH_LEN]) {
+
+    int ret = recursive_traverse(directory_path, rmdir_cb, NULL);
+    if (ret != 0) {
+        return ret;
+    }
+
+    errno = 0;
+    if ((ret = rmdir(directory_path)) != 0) {
+        return errno;
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Copy a directory recursively
+ *
+ * @param directory_path Directory to copy
+ * @param new_directory_path Destination to copy to
+ * @return 0 on success else appropriate error as returned by errno
+ */
+int
+libze_util_copydir(char const directory_path[LIBZE_MAX_PATH_LEN],
+                   char const new_directory_path[LIBZE_MAX_PATH_LEN]) {
+
+    return recursive_traverse(directory_path, copy_cb,
+                              &(struct copy_data){.location = new_directory_path});
 }
 
 /**

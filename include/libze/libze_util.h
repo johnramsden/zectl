@@ -58,6 +58,9 @@ int
 libze_util_copydir(char const directory_path[LIBZE_MAX_PATH_LEN],
                    char const new_directory_path[LIBZE_MAX_PATH_LEN]);
 
+int
+libze_util_rmdir(char const directory_path[LIBZE_MAX_PATH_LEN]);
+
 libze_error
 libze_util_replace_string(char const *to_replace, char const *replacement, size_t line_length,
                           char const line[line_length], size_t line_replaced_length,

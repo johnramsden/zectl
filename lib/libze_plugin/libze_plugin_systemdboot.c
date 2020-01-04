@@ -1219,7 +1219,75 @@ libze_plugin_systemdboot_post_create(libze_handle *lzeh, char const be_name[LIBZ
  ************************** Post-destroy ****************************
  ********************************************************************/
 
+static libze_error
+remove_kernels(libze_handle *lzeh, char const efi_mountpoint[LIBZE_MAX_PATH_LEN],
+               char const be_name[LIBZE_MAX_PATH_LEN]) {
+
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    /* Copy <esp>/loader/entries/<prefix>-<oldbe>.conf -> <prefix>-<be>.conf */
+    char loader_buf[LIBZE_MAX_PATH_LEN];
+    char kernels_buf[LIBZE_MAX_PATH_LEN];
+
+    ret = form_loader_entry_config(efi_mountpoint, be_name, loader_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "BE loader path exceeds max path length.\n");
+    }
+
+    ret = form_loader_entry_path(efi_mountpoint, "env", be_name, kernels_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "BE loader path exceeds max path length.\n");
+    }
+
+    errno = 0;
+    int interr = remove(loader_buf);
+    if (interr != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to remove %s.\n", loader_buf);
+    }
+
+    errno = 0;
+    interr = libze_util_rmdir(kernels_buf);
+    if (interr != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to remove %s.\n", kernels_buf);
+    }
+
+    return ret;
+}
+
 libze_error
 libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]) {
-    return LIBZE_ERROR_SUCCESS;
+
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char active_be[ZFS_MAX_DATASET_NAME_LEN];
+    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Bootfs exceeds max path length.\n");
+    }
+
+    char boot_mountpoint[ZFS_MAXPROPLEN];
+    char efi_mountpoint[ZFS_MAXPROPLEN];
+
+    char namespace_buf[ZFS_MAXPROPLEN];
+    if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf) !=
+        LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "Exceeded max property name length.\n");
+    }
+
+    ret = libze_be_prop_get(lzeh, boot_mountpoint, "boot", namespace_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                               "Couldn't access systemdboot:boot property.\n");
+    }
+    ret = libze_be_prop_get(lzeh, efi_mountpoint, "efi", namespace_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                               "Couldn't access systemdboot:efi property.\n");
+    }
+
+    ret = remove_kernels(lzeh, efi_mountpoint, be_name);
+
+    return ret;
 }
