@@ -14,9 +14,11 @@ set(SOURCE_FILES
         zectl_get.c
         zectl_util.h zectl_util.c)
 
-list(APPEND ZE_LINK_LIBRARIES
-        libze libze_plugin_systemdboot)
+list(APPEND ZE_LINK_LIBRARIES libze)
+#list(APPEND ZE_LINK_LIBRARIES libze libze_plugin_systemdboot)
 
 add_executable(zectl ${SOURCE_FILES})
 
 target_link_libraries(zectl ${ZE_LINK_LIBRARIES})
+
+install(TARGETS zectl DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

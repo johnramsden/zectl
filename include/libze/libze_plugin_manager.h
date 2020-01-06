@@ -43,7 +43,7 @@ typedef struct libze_plugin_fn_export {
 } libze_plugin_fn_export;
 
 libze_plugin_manager_error
-libze_plugin_open(char *ze_plugin, void **p_handle);
+libze_plugin_open(char const *ze_plugin, void **p_handle);
 
 int
 libze_plugin_close(void *libhandle);

@@ -14,7 +14,7 @@
  * @return Handle to the library, or @p NULL if it doesn't exist
  */
 libze_plugin_manager_error
-libze_plugin_open(char *ze_plugin, void **p_handle) {
+libze_plugin_open(char const *ze_plugin, void **p_handle) {
 #ifndef PLUGINS_DIRECTORY
     return LIBZE_PLUGIN_MANAGER_ERROR_PDIR_EEXIST;
 #endif

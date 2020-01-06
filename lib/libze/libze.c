@@ -21,8 +21,6 @@
 // Unsigned long long is 64 bits or more
 #define ULL_SIZE 128
 
-char const *ZE_PROP_NAMESPACE = "org.zectl";
-
 static int
 libze_clone_cb(zfs_handle_t *zhdl, void *data);
 

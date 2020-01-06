@@ -10,7 +10,7 @@
 // 255 in case mounted on non-ZFS
 #define LIBZE_MAX_PATH_LEN 255
 
-extern char const *ZE_PROP_NAMESPACE;
+#define ZE_PROP_NAMESPACE "org.zectl"
 
 /** @enum libze_error
  * Error type

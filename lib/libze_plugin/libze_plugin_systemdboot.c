@@ -1,5 +1,6 @@
 #include "libze_plugin/libze_plugin_systemdboot.h"
 
+#include "libze/libze.h"
 #include "libze/libze_util.h"
 
 #include <regex.h>
