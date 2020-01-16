@@ -515,7 +515,7 @@ get_fstab_line_from_regex(libze_handle *lzeh, void *data, char const line[LIBZE_
 
     char replace_two[LIBZE_MAX_PATH_LEN] = "";
 
-    ret = libze_util_concat("\\1", rmd->be_name, "\\3", LIBZE_MAX_PATH_LEN, replace_two);
+    ret = libze_util_concat("\\1", rmd->be_name, "    \\3", LIBZE_MAX_PATH_LEN, replace_two);
     if (ret != LIBZE_ERROR_SUCCESS) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                               "Exceeded max path length for regex buffer.\n");
