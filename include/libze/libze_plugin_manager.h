@@ -13,9 +13,14 @@ typedef enum libze_plugin_manager_error {
 } libze_plugin_manager_error;
 
 typedef struct libze_activate_data {
-    char *be_mountpoint;
-    char *be_name;
+    char const *const be_mountpoint;
+    char const *const be_name;
 } libze_activate_data;
+
+typedef struct libze_create_data {
+    char const *const be_mountpoint;
+    char const *const be_name;
+} libze_create_data;
 
 typedef libze_error (*plugin_fn_init)(libze_handle *lzeh);
 
@@ -30,8 +35,7 @@ typedef libze_error (*plugin_fn_post_activate)(libze_handle *lzeh,
 typedef libze_error (*plugin_fn_post_destroy)(libze_handle *lzeh,
                                               char const be_name[LIBZE_MAX_PATH_LEN]);
 
-typedef libze_error (*plugin_fn_post_create)(libze_handle *lzeh,
-                                             char const be_name[LIBZE_MAX_PATH_LEN]);
+typedef libze_error (*plugin_fn_post_create)(libze_handle *lzeh, libze_create_data *create_data);
 
 typedef struct libze_plugin_fn_export {
     plugin_fn_init plugin_init;

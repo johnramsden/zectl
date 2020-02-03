@@ -550,8 +550,8 @@ done:
  * @brief Using boot mountpoint update fstab
  *
  * @param lzeh               libze handle
+ * @param create_data        Create data
  * @param boot_mountpoint    Mountpoint of boot partition
- * @param be_mountpoint      BE mountpoint
  * @param efi_mountpoint     EFI mountpoint
  *
  * @return                   @p LIBZE_ERROR_UNKNOWN Boot mountpoint is not set
@@ -559,7 +559,7 @@ done:
  *                           @p LIBZE_ERROR_SUCCESS On success
  */
 static libze_error
-update_fstab(libze_handle *lzeh, libze_activate_data *activate_data,
+update_fstab(libze_handle *lzeh, libze_create_data *create_data,
              char const boot_mountpoint[LIBZE_MAX_PATH_LEN],
              char const efi_mountpoint[LIBZE_MAX_PATH_LEN]) {
 
@@ -573,7 +573,7 @@ update_fstab(libze_handle *lzeh, libze_activate_data *activate_data,
 
     /* Get path to fstab */
     char fstab_buf[LIBZE_MAX_PATH_LEN] = "";
-    if ((strlcpy(fstab_buf, activate_data->be_mountpoint, LIBZE_MAX_PATH_LEN) >=
+    if ((strlcpy(fstab_buf, create_data->be_mountpoint, LIBZE_MAX_PATH_LEN) >=
          LIBZE_MAX_PATH_LEN) ||
         (strlcat(fstab_buf, "/etc/fstab", LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN)) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
@@ -611,7 +611,7 @@ update_fstab(libze_handle *lzeh, libze_activate_data *activate_data,
     }
 
     struct replace_fstab_data data = {.active_be = active_be,
-                                      .be_name = activate_data->be_name,
+                                      .be_name = create_data->be_name,
                                       .boot_mountpoint = boot_mountpoint,
                                       .efi_mountpoint = efi_mountpoint};
 
@@ -655,33 +655,7 @@ err:
  */
 libze_error
 libze_plugin_systemdboot_mid_activate(libze_handle *lzeh, libze_activate_data *activate_data) {
-
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    char boot_mountpoint[ZFS_MAXPROPLEN];
-    char efi_mountpoint[ZFS_MAXPROPLEN];
-
-    char namespace_buf[ZFS_MAXPROPLEN];
-    if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf) !=
-        LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                               "Exceeded max property name length.\n");
-    }
-
-    ret = libze_be_prop_get(lzeh, boot_mountpoint, "boot", namespace_buf);
-    if (ret != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                               "Couldn't access systemdboot:boot property.\n");
-    }
-    ret = libze_be_prop_get(lzeh, efi_mountpoint, "efi", namespace_buf);
-    if (ret != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                               "Couldn't access systemdboot:efi property.\n");
-    }
-
-    ret = update_fstab(lzeh, activate_data, boot_mountpoint, efi_mountpoint);
-
-    return ret;
+    return LIBZE_ERROR_SUCCESS;
 }
 
 /********************************************************************
@@ -1148,7 +1122,7 @@ replace_be_name(libze_handle *lzeh, char const be_name[ZFS_MAX_DATASET_NAME_LEN]
  *         @p LIBZE_ERROR_UNKNOWN if couldn't access a property,
  */
 libze_error
-libze_plugin_systemdboot_post_create(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]) {
+libze_plugin_systemdboot_post_create(libze_handle *lzeh, libze_create_data *create_data) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
     int iret = 0;
@@ -1185,7 +1159,7 @@ libze_plugin_systemdboot_post_create(libze_handle *lzeh, char const be_name[LIBZ
 
     ret = form_loader_entry_config(efi_mountpoint, active_be, loader_buf);
     if (ret == LIBZE_ERROR_SUCCESS) {
-        ret = form_loader_entry_config(efi_mountpoint, be_name, new_loader_buf);
+        ret = form_loader_entry_config(efi_mountpoint, create_data->be_name, new_loader_buf);
     }
 
     if (ret != LIBZE_ERROR_SUCCESS) {
@@ -1193,14 +1167,14 @@ libze_plugin_systemdboot_post_create(libze_handle *lzeh, char const be_name[LIBZ
                                "BE loader path exceeds max path length.\n");
     }
 
-    ret = replace_be_name(lzeh, be_name, active_be, loader_buf, new_loader_buf);
+    ret = replace_be_name(lzeh, create_data->be_name, active_be, loader_buf, new_loader_buf);
     if (ret != LIBZE_ERROR_SUCCESS) {
         return ret;
     }
 
     ret = form_loader_entry_path(efi_mountpoint, "env", active_be, loader_buf);
     if (ret == LIBZE_ERROR_SUCCESS) {
-        ret = form_loader_entry_path(efi_mountpoint, "env", be_name, new_loader_buf);
+        ret = form_loader_entry_path(efi_mountpoint, "env", create_data->be_name, new_loader_buf);
     }
     if (ret != LIBZE_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
@@ -1212,6 +1186,8 @@ libze_plugin_systemdboot_post_create(libze_handle *lzeh, char const be_name[LIBZ
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to copy %s to %s.\n", loader_buf,
                                new_loader_buf);
     }
+
+    ret = update_fstab(lzeh, create_data, boot_mountpoint, efi_mountpoint);
 
     return ret;
 }

@@ -21,7 +21,7 @@ libze_error
 libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]);
 
 libze_error
-libze_plugin_systemdboot_post_create(libze_handle *lzeh, char const be_name[LIBZE_MAX_PATH_LEN]);
+libze_plugin_systemdboot_post_create(libze_handle *lzeh, libze_create_data *create_data);
 
 libze_plugin_fn_export const exported_plugin = {
     .plugin_init = libze_plugin_systemdboot_init,

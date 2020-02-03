@@ -817,12 +817,99 @@ libze_bootloader_set(libze_handle *lzeh) {
                                       plugin);
             }
         }
-        // if (libze_plugin_close(p_handle) != 0) {
-        //     ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN,
-        //             "Failed to close plugin %s\n", plugin);
-        // }
     }
 
+    return ret;
+}
+
+/**
+ * @brief Execute an unmount of a already temp_mount_be mounted dataset
+ *
+ * @param[in,out] lzeh       libze handle
+ * @param[in] tmp_dirname    Directory to unmount be from
+ * @param[in] be_zh          Handle to be
+ *
+ * @return @p LIBZE_ERROR_SUCCESS on success, or @p LIBZE_ERROR_UNKNOWN on failure
+ */
+static libze_error
+temp_unmount_be(libze_handle *lzeh, char const *tmp_dirname, zfs_handle_t *be_zh) {
+
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    nvlist_t *props = fnvlist_alloc();
+    if (props == NULL) {
+        return libze_error_nomem(lzeh);
+    }
+    nvlist_add_string(props, "canmount", "noauto");
+    nvlist_add_string(props, "mountpoint", "/");
+
+    if (!zfs_is_mounted(be_zh, NULL)) {
+        return LIBZE_ERROR_SUCCESS;
+    }
+
+    // Retain existing error if occurred
+    if (zfs_unmount(be_zh, NULL, 0) != 0) {
+        ret = libze_error_prepend(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to unmount %s", tmp_dirname);
+    } else {
+        rmdir(tmp_dirname);
+        if ((zfs_prop_set_list(be_zh, props) != 0)) {
+            ret = libze_error_prepend(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to unset mountpoint %s:\n",
+                                      tmp_dirname);
+        }
+    }
+
+    return ret;
+}
+
+/**
+ * @brief Execute a temporary mount of a dataset
+ *
+ * @param[in,out] lzeh        libze handle
+ * @param[in] be_name         Boot environment name
+ * @param[out] tmp_dirname    Directory to unmount be from
+ * @param[in] be_zh           Handle to be
+ *
+ * @return @p LIBZE_ERROR_SUCCESS on success, or @p LIBZE_ERROR_UNKNOWN on failure
+ */
+static libze_error
+temp_mount_be(libze_handle *lzeh, char const *be_name, zfs_handle_t *be_zh, char **tmp_dirname) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char const *ds_name = zfs_get_name(be_zh);
+
+    // Not currently mounted
+    char tmpdir_template[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (libze_util_concat("/tmp/ze.", be_name, ".XXXXXX", ZFS_MAX_DATASET_NAME_LEN,
+                          tmpdir_template) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Could not create directory template\n");
+    }
+
+    // Create tmp mountpoint
+    *tmp_dirname = mkdtemp(tmpdir_template);
+    if (tmp_dirname == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Could not create tmp directory %s\n",
+                               tmpdir_template);
+    }
+
+    // AFTER here always goto err to cleanup
+
+    if (zfs_prop_set(be_zh, "mountpoint", *tmp_dirname) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to set mountpoint=%s for %s\n",
+                              tmpdir_template, ds_name);
+        goto err;
+    }
+
+    if (zfs_mount(be_zh, NULL, 0) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to mount %s to %s\n", ds_name,
+                              tmpdir_template);
+        goto err;
+    }
+
+    return ret;
+
+err:
+    // Retain existing error (ret)
+    (void) temp_unmount_be(lzeh, *tmp_dirname, be_zh);
     return ret;
 }
 
@@ -1202,68 +1289,30 @@ mid_activate(libze_handle *lzeh, libze_activate_options *options, zfs_handle_t *
     char const *ds_name = zfs_get_name(be_zh);
     boolean_t is_root = libze_is_root_be(lzeh, ds_name);
 
-    nvlist_t *props = fnvlist_alloc();
-    if (props == NULL) {
-        return libze_error_nomem(lzeh);
-    }
-    nvlist_add_string(props, "canmount", "noauto");
-
-    if (!is_root) {
-        nvlist_add_string(props, "mountpoint", "/");
-
-        // Not currently mounted
-        char tmpdir_template[ZFS_MAX_DATASET_NAME_LEN] = "";
-        if (libze_util_concat("/tmp/ze.", options->be_name, ".XXXXXX", ZFS_MAX_DATASET_NAME_LEN,
-                              tmpdir_template) != LIBZE_ERROR_SUCCESS) {
-            return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                                   "Could not create directory template\n");
-        }
-
-        // Create tmp mountpoint
-        tmp_dirname = mkdtemp(tmpdir_template);
-        if (tmp_dirname == NULL) {
-            return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Could not create tmp directory %s\n",
-                                   tmpdir_template);
-        }
-
-        // AFTER here always goto err to cleanup
-
-        if (zfs_prop_set(be_zh, "mountpoint", tmp_dirname) != 0) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to set mountpoint=%s for %s\n",
-                                  tmpdir_template, ds_name);
-            goto err;
-        }
-
-        if (zfs_mount(be_zh, NULL, 0) != 0) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to mount %s to %s\n", ds_name,
-                                  tmpdir_template);
-            goto err;
-        }
-    }
-
-    libze_activate_data activate_data = {.be_name = options->be_name, .be_mountpoint = tmp_dirname};
-
     // mid_activate
-    if ((lzeh->lz_funcs != NULL) &&
-        (lzeh->lz_funcs->plugin_mid_activate(lzeh, &activate_data) != 0)) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN, "Failed to run mid-activate hook\n");
-        goto err;
+    if ((lzeh->lz_funcs != NULL)) {
+        /* Only temp mount if we are running hook */
+        if (!is_root) {
+            ret = temp_mount_be(lzeh, options->be_name, be_zh, &tmp_dirname);
+            if (ret != LIBZE_ERROR_SUCCESS) {
+                goto err;
+            }
+        }
+
+        libze_activate_data activate_data = {.be_name = options->be_name,
+                                             .be_mountpoint = tmp_dirname};
+
+        if (lzeh->lz_funcs->plugin_mid_activate(lzeh, &activate_data) != 0) {
+            ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN, "Failed to run mid-activate hook\n");
+            goto err;
+        }
     }
 
 err:
-    if (!is_root && zfs_is_mounted(be_zh, NULL)) {
-        // Retain existing error if occurred
-        if ((zfs_unmount(be_zh, NULL, 0) != 0) && (ret != LIBZE_ERROR_SUCCESS)) {
-            ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to unmount %s", ds_name);
-        } else {
-            rmdir(tmp_dirname);
-            if ((zfs_prop_set_list(be_zh, props) != 0) && (ret != LIBZE_ERROR_SUCCESS)) {
-                ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                                      "Failed to unset mountpoint for %s:\n", ds_name);
-            }
-        }
+    if (!is_root) {
+        ret = (ret == LIBZE_ERROR_SUCCESS) ? temp_unmount_be(lzeh, tmp_dirname, be_zh) : ret;
     }
-    nvlist_free(props);
+
     return ret;
 }
 
@@ -1700,6 +1749,64 @@ prepare_create_from_existing(libze_handle *lzeh, char const be_source[ZFS_MAX_DA
 }
 
 /**
+ * @brief Function ran post-create, execute plugin if it exists.
+ * @param[in] lzeh Initialized @p libze_handle
+ * @param[in] options Options to set properties based on
+ * @param[in] be_zh Initialized @p zfs_handle_t to run mid activate upon
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_UNKNOWN, or @p LIBZE_ERROR_PLUGIN on failure.
+ *
+ * @pre lzeh != NULL
+ * @pre be_zh != NULL
+ * @pre options != NULL
+ * @post if be_zh != root dataset, be_zh unmounted on exit
+ */
+static libze_error
+post_create(libze_handle *lzeh, libze_create_options *options) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    if (lzeh->lz_funcs == NULL) {
+        return ret;
+    }
+
+    char *tmp_dirname = "/";
+
+    zfs_handle_t *be_zh = NULL, *be_bpool_zh = NULL;
+    char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
+
+    if (open_boot_environment(lzeh, options->be_name, &be_zh, be_ds, &be_bpool_zh, NULL) !=
+        LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to open boot environment (%s) for post-create!\n",
+                                   options->be_name);
+    }
+
+    char const *ds_name = zfs_get_name(be_zh);
+    boolean_t is_root = libze_is_root_be(lzeh, ds_name);
+
+    if (!is_root) {
+        ret = temp_mount_be(lzeh, options->be_name, be_zh, &tmp_dirname);
+        if (ret != LIBZE_ERROR_SUCCESS) {
+            goto err;
+        }
+    }
+
+    libze_create_data create_data = {.be_name = options->be_name, .be_mountpoint = tmp_dirname};
+
+    if (lzeh->lz_funcs->plugin_post_create(lzeh, &create_data) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN, "Failed to run post-create hook\n");
+        goto err;
+    }
+
+err:
+    if (!is_root) {
+        ret = (ret == LIBZE_ERROR_SUCCESS) ? temp_unmount_be(lzeh, tmp_dirname, be_zh) : ret;
+    }
+
+    return ret;
+}
+
+/**
  * @brief Create boot environment
  * @param lzeh Initialized libze handle
  * @param options Options for boot environment
@@ -1784,10 +1891,12 @@ libze_create(libze_handle *lzeh, libze_create_options *options) {
                                    "Failed to validate new boot environment (%s)!\n",
                                    options->be_name);
     }
+
     if (libze_clone(lzeh, cdata.source_dataset, cdata.snap_suffix, new_ds, options->recursive) !=
         LIBZE_ERROR_SUCCESS) {
         return LIBZE_ERROR_UNKNOWN;
     }
+
     if (strlen(new_bpool_ds) > 0) {
         if (libze_clone(lzeh, boot_pool_cdata.source_dataset, boot_pool_cdata.snap_suffix,
                         new_bpool_ds, options->recursive) != LIBZE_ERROR_SUCCESS) {
@@ -1797,12 +1906,9 @@ libze_create(libze_handle *lzeh, libze_create_options *options) {
         }
     }
 
-    if ((lzeh->lz_funcs != NULL) &&
-        (lzeh->lz_funcs->plugin_post_create(lzeh, options->be_name) != LIBZE_ERROR_SUCCESS)) {
-        return lzeh->libze_error;
-    }
+    ret = post_create(lzeh, options);
 
-    return LIBZE_ERROR_SUCCESS;
+    return ret;
 }
 
 /*************************************
