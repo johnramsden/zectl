@@ -14,7 +14,7 @@
  */
 libze_error
 libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader,
-                      char const ze_namespace[static 1]) {
+                      char const ze_namespace[]) {
     nvlist_t *out_props = NULL;
     if (libze_be_props_get(lzeh, &out_props, ze_namespace) != LIBZE_ERROR_SUCCESS) {
         return LIBZE_ERROR_UNKNOWN;

@@ -51,7 +51,7 @@ ze_usage(void) {
  * Return a function pointer to the requested command or NULL if no match
  */
 static command_func
-get_command(command_map_t *ze_command_map, int num_command_options, char input_name[static 1]) {
+get_command(command_map_t *ze_command_map, int num_command_options, char input_name[]) {
     command_func command = NULL;
 
     for (int i = 0; i < num_command_options; i++) {

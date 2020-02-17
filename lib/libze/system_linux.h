@@ -22,6 +22,6 @@ typedef enum system_fs_error {
 } system_fs_error;
 
 system_fs_error
-libze_dataset_from_mountpoint(char mountpoint[static 1], size_t buflen, char dataset_buf[buflen]);
+libze_dataset_from_mountpoint(char mountpoint[], size_t buflen, char dataset_buf[buflen]);
 
 #endif // ZE_SYSTEM_LINUX_H

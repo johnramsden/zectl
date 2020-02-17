@@ -51,7 +51,7 @@ libze_util_concat(char const *prefix, char const *separator, char const *suffix,
  * @return Non-zero if buffer is too short, or there is no instance of delimiter
  */
 int
-libze_util_cut(char const path[static 1], size_t buflen, char buf[buflen], char delimiter) {
+libze_util_cut(char const path[], size_t buflen, char buf[buflen], char delimiter) {
     char *slashp = NULL;
 
     if (strlcpy(buf, path, buflen) >= buflen) {
@@ -80,8 +80,8 @@ libze_util_cut(char const path[static 1], size_t buflen, char buf[buflen], char 
  * @return Non-zero if buffer is too short, or there is no instance of delimiter
  */
 int
-libze_util_split(char const path[static 1], size_t buflen, char buf_pre[buflen],
-                 char buf_post[buflen], char delimiter) {
+libze_util_split(char const path[], size_t buflen, char buf_pre[buflen],
+        char buf_post[buflen], char delimiter) {
     char *slashp = NULL;
 
     if (strlcpy(buf_pre, path, buflen) >= buflen) {
@@ -116,7 +116,7 @@ libze_util_split(char const path[static 1], size_t buflen, char buf_pre[buflen],
  *         or if the length of the buffer is exceeded
  */
 int
-libze_util_suffix_after_string(char const root[static 1], char const dataset[static 1],
+libze_util_suffix_after_string(char const root[], char const dataset[],
                                size_t buflen, char buf[buflen]) {
 
     if (strlcpy(buf, dataset, buflen) >= buflen) {
@@ -176,7 +176,7 @@ libze_boot_env_name(char const *dataset, size_t buflen, char buf[buflen]) {
  * @return @p B_TRUE if active, else @p B_FALSE
  */
 boolean_t
-libze_is_active_be(libze_handle *lzeh, char const be[static 1]) {
+libze_is_active_be(libze_handle *lzeh, char const be[]) {
     if (strchr(be, '/') == NULL) {
         return ((strcmp(lzeh->env_activated, be) == 0) ? B_TRUE : B_FALSE);
     }
@@ -193,7 +193,7 @@ libze_is_active_be(libze_handle *lzeh, char const be[static 1]) {
  * @return @p B_TRUE if running, else @p B_FALSE
  */
 boolean_t
-libze_is_root_be(libze_handle *lzeh, char const be[static 1]) {
+libze_is_root_be(libze_handle *lzeh, char const be[]) {
     if (strchr(be, '/') == NULL) {
         return ((strcmp(lzeh->env_running, be) == 0) ? B_TRUE : B_FALSE);
     }
@@ -272,7 +272,7 @@ libze_get_root_dataset(libze_handle *lzeh) {
  * @return Zero on success
  */
 int
-libze_get_zpool_name_from_dataset(char const dataset[static 3], size_t buflen, char buf[buflen]) {
+libze_get_zpool_name_from_dataset(char const dataset[], size_t buflen, char buf[buflen]) {
     if (buflen > 0) {
         if (dataset[0] == '/') {
             return -1;
@@ -298,7 +298,7 @@ libze_get_zpool_name_from_dataset(char const dataset[static 3], size_t buflen, c
  */
 libze_error
 libze_util_temporary_mount(char const dataset[ZFS_MAX_DATASET_NAME_LEN],
-                           char const mountpoint[static 2]) {
+                           char const mountpoint[]) {
     char const *mount_settings = "zfsutil";
     char const *mount_type = "zfs";
     const unsigned long mount_flags = 0;
@@ -319,7 +319,7 @@ libze_util_temporary_mount(char const dataset[ZFS_MAX_DATASET_NAME_LEN],
  * @return 0 on success else appropriate error as returned by @p errno
  */
 static int
-libze_util_copy_filepointer(FILE file[static 1], FILE new_file[static 1]) {
+libze_util_copy_filepointer(FILE file[], FILE new_file[]) {
     errno = 0;
     char buf[COPY_BUFLEN];
 

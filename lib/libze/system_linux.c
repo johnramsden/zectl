@@ -19,7 +19,7 @@
  *         @p SYSTEM_ERR_UNKNOWN if buflen exceeded.
  */
 system_fs_error
-libze_dataset_from_mountpoint(char mountpoint[static 1], size_t buflen, char dataset_buf[buflen]) {
+libze_dataset_from_mountpoint(char mountpoint[], size_t buflen, char dataset_buf[buflen]) {
 
     struct mntent *ent = NULL;
     system_fs_error ret = SYSTEM_ERR_SUCCESS;

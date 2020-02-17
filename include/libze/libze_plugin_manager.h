@@ -61,10 +61,10 @@ int
 libze_plugin_export(void *libhandle, libze_plugin_fn_export **ze_export);
 
 libze_plugin_manager_error
-libze_plugin_form_namespace(char const plugin_name[static 1], char buf[ZFS_MAXPROPLEN]);
+libze_plugin_form_namespace(char const plugin_name[], char buf[ZFS_MAXPROPLEN]);
 
 libze_plugin_manager_error
-libze_plugin_form_property(char const plugin_name[static 1], char const plugin_suffix[static 1],
+libze_plugin_form_property(char const plugin_name[], char const plugin_suffix[],
                            char buf[ZFS_MAXPROPLEN]);
 
 #endif // ZECTL_LIBZE_PLUGIN_MANAGER_H

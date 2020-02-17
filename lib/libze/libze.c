@@ -25,7 +25,7 @@ static int
 libze_clone_cb(zfs_handle_t *zhdl, void *data);
 
 static libze_error
-parse_property(char const property[static 1], char property_prefix[ZFS_MAXPROPLEN],
+parse_property(char const property[], char property_prefix[ZFS_MAXPROPLEN],
                char property_suffix[ZFS_MAXPROPLEN]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
@@ -88,7 +88,7 @@ parse_property(char const property[static 1], char property_prefix[ZFS_MAXPROPLE
  *         @p LIBZE_ERROR_MOUNTPOINT if the dataset exists but is not mountable
  */
 static libze_error
-validate_existing_be(libze_handle *lzeh, char const be[static 1],
+validate_existing_be(libze_handle *lzeh, char const be[],
                      char be_ds[ZFS_MAX_DATASET_NAME_LEN],
                      char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
@@ -183,7 +183,7 @@ validate_existing_be(libze_handle *lzeh, char const be[static 1],
  *         @p LIBZE_ERROR_MAXPATHLEN if a name or path length exceeded
  */
 static libze_error
-validate_new_be(libze_handle *lzeh, char const be[static 1], char be_ds[ZFS_MAX_DATASET_NAME_LEN],
+validate_new_be(libze_handle *lzeh, char const be[], char be_ds[ZFS_MAX_DATASET_NAME_LEN],
                 char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
     char be_ds_int[ZFS_MAX_DATASET_NAME_LEN] = "";
@@ -250,7 +250,7 @@ validate_new_be(libze_handle *lzeh, char const be[static 1], char be_ds[ZFS_MAX_
  * @return @p LIBZE_ERROR_SUCCESS on success
  */
 static libze_error
-open_boot_environment(libze_handle *lzeh, char const be[static 1], zfs_handle_t **be_zh,
+open_boot_environment(libze_handle *lzeh, char const be[], zfs_handle_t **be_zh,
                       char be_ds[ZFS_MAX_DATASET_NAME_LEN], zfs_handle_t **be_bpool_zh,
                       char be_bpool_ds[ZFS_MAX_DATASET_NAME_LEN]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
@@ -408,7 +408,7 @@ libze_add_get_property(libze_handle *lzeh, nvlist_t **properties, char const *pr
  * @param[out] prop_out Output property list
  * @param name Name of property without nameapace
  * @param value Value of default property
- * @param namespace Property namespace without colon
+ * @param ze_namespace Property namespace without colon
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_NOMEM if nvlist can't be duplicated,
  *         @p LIBZE_ERROR_UNKNOWN otherwise
@@ -422,7 +422,7 @@ libze_add_get_property(libze_handle *lzeh, nvlist_t **properties, char const *pr
  */
 libze_error
 libze_default_prop_add(nvlist_t **prop_out, char const *name, char const *value,
-                       char const *namespace) {
+                       char const *ze_namespace) {
     nvlist_t *default_prop = fnvlist_alloc();
     if (default_prop == NULL) {
         return LIBZE_ERROR_NOMEM;
@@ -433,7 +433,7 @@ libze_default_prop_add(nvlist_t **prop_out, char const *name, char const *value,
     }
 
     char name_buf[ZFS_MAXPROPLEN] = "";
-    if (libze_util_concat(namespace, ":", name, ZFS_MAXPROPLEN, name_buf) != LIBZE_ERROR_SUCCESS) {
+    if (libze_util_concat(ze_namespace, ":", name, ZFS_MAXPROPLEN, name_buf) != LIBZE_ERROR_SUCCESS) {
         goto err;
     }
 
@@ -457,10 +457,10 @@ err:
  *         @p LIBZE_ERROR_UNKNOWN otherwise
  *
  * @pre @p default_prop != NULL
- * @pre @p namespace != NULL
+ * @pre @p ze_namespace != NULL
  */
 libze_error
-libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop, char const *namespace) {
+libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop, char const *ze_namespace) {
     nvpair_t *pair = NULL;
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
@@ -474,7 +474,7 @@ libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop, char const *
             return LIBZE_ERROR_UNKNOWN;
         }
 
-        if (strcmp(buf, namespace) != 0) {
+        if (strcmp(buf, ze_namespace) != 0) {
             continue;
         }
 
@@ -513,19 +513,19 @@ libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop, char const *
 }
 
 /**
- * @brief Filter out boot environment properties based on name of program namespace
+ * @brief Filter out boot environment properties based on name of program ze_namespace
  * @param[in] unfiltered_nvl @p nvlist_t to filter based on namespace
  * @param[out] result_nvl Filtered @p nvlist_t continuing only properties matching namespace
- * @param namespace Prefix property to filter based on
+ * @param ze_namespace Prefix property to filter based on
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_UNKNOWN on failure.
  *
  * @pre @p unfiltered_nvl != NULL
- * @pre @p namespace != NULL
+ * @pre @p ze_namespace != NULL
  */
 static libze_error
 libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
-                      char const namespace[static 1]) {
+                      char const ze_namespace[]) {
     nvpair_t *pair = NULL;
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
@@ -535,8 +535,8 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
         char buf[ZFS_MAXPROPLEN];
 
         // Make sure namespace ends
-        if ((strlen(nvp_name) + 1) < (strlen(namespace) + 1)) {
-            char after_namespace = nvp_name[strlen(namespace) + 1];
+        if ((strlen(nvp_name) + 1) < (strlen(ze_namespace) + 1)) {
+            char after_namespace = nvp_name[strlen(ze_namespace) + 1];
             if ((after_namespace != '.') && (after_namespace != ':')) {
                 continue;
             }
@@ -546,7 +546,7 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
             return LIBZE_ERROR_UNKNOWN;
         }
 
-        if (strncmp(buf, namespace, strlen(namespace)) == 0) {
+        if (strncmp(buf, ze_namespace, strlen(ze_namespace)) == 0) {
             nvlist_add_nvpair(*result_nvl, pair);
         }
     }
@@ -560,21 +560,21 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
  * @param[in] lzeh Initialized lzeh libze handle
  * @param[out] result_prop Property of boot environment
  * @param[in] prop ZFS property looking for
- * @param[in] namespace ZFS property prefix
+ * @param[in] ze_namespace ZFS property prefix
  * @return LIBZE_ERROR_SUCCESS on success, or
  *         LIBZE_ERROR_MAXPATHLEN, LIBZE_ERROR_UNKNOWN
  *
  * @pre @p lzeh != NULL
  * @pre @p property != NULL
- * @pre @p namespace != NULL
+ * @pre @p ze_namespace != NULL
  */
 libze_error
 libze_be_prop_get(libze_handle *lzeh, char *result_prop, char const *property,
-                  char const *namespace) {
+                  char const *ze_namespace) {
     nvlist_t *lookup_prop = NULL;
 
     char prop_buf[ZFS_MAXPROPLEN] = "";
-    if (libze_util_concat(namespace, ":", property, ZFS_MAXPROPLEN, prop_buf) !=
+    if (libze_util_concat(ze_namespace, ":", property, ZFS_MAXPROPLEN, prop_buf) !=
         LIBZE_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Exceeded length of property.\n");
     }
@@ -604,7 +604,7 @@ libze_be_prop_get(libze_handle *lzeh, char *result_prop, char const *property,
 }
 
 /**
- * @brief Get all the ZFS properties which have been set with the @p namespace prefix
+ * @brief Get all the ZFS properties which have been set with the @p ze_namespace prefix
  *        and return them in @a result.
  *
  *        Properties in form:
@@ -616,15 +616,15 @@ libze_be_prop_get(libze_handle *lzeh, char *result_prop, char const *property,
  *
  * @param[in] lzeh Initialized lzeh libze handle
  * @param[out] result Properties of boot environment
- * @param[in] namespace ZFS property prefix
+ * @param[in] ze_namespace ZFS property prefix
  * @return LIBZE_ERROR_SUCCESS on success, or
  *         LIBZE_ERROR_ZFS_OPEN, LIBZE_ERROR_UNKNOWN, LIBZE_ERROR_NOMEM
  *
  * @pre @p lzeh != NULL
- * @pre @p namespace != NULL
+ * @pre @p ze_namespace != NULL
  */
 libze_error
-libze_be_props_get(libze_handle *lzeh, nvlist_t **result, char const *namespace) {
+libze_be_props_get(libze_handle *lzeh, nvlist_t **result, char const *ze_namespace) {
     nvlist_t *user_props = NULL;
     nvlist_t *filtered_user_props = NULL;
     libze_error ret = LIBZE_ERROR_SUCCESS;
@@ -646,7 +646,7 @@ libze_be_props_get(libze_handle *lzeh, nvlist_t **result, char const *namespace)
         goto err;
     }
 
-    if ((ret = libze_filter_be_props(user_props, &filtered_user_props, namespace)) !=
+    if ((ret = libze_filter_be_props(user_props, &filtered_user_props, ze_namespace)) !=
         LIBZE_ERROR_SUCCESS) {
         goto err;
     }
@@ -1506,8 +1506,8 @@ err:
  * @pre be != NULL
  */
 libze_error
-libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suffix[static 1],
-            char be[static 1], boolean_t recursive) {
+libze_clone(libze_handle *lzeh, char source_root[], char source_snap_suffix[],
+            char be[], boolean_t recursive) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
     nvlist_t *cdata = NULL;
@@ -2330,7 +2330,7 @@ typedef struct libze_mount_cb_data {
  * @return non-zero on failure.
  */
 static int
-directory_create_if_nonexistent(char const path[static 1]) {
+directory_create_if_nonexistent(char const path[]) {
     DIR *dir = opendir(path);
     if (dir != NULL) {
         // Directory exists
@@ -2404,7 +2404,7 @@ mount_callback(zfs_handle_t *zh, void *data) {
  * @return @p LIBZE_ERROR_SUCCESS on success
  */
 libze_error
-libze_mount(libze_handle *lzeh, char const boot_environment[static 1], char const *mountpoint,
+libze_mount(libze_handle *lzeh, char const boot_environment[], char const *mountpoint,
             char mountpoint_buffer[LIBZE_MAX_PATH_LEN]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
     char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
@@ -2543,8 +2543,8 @@ err:
  *         @p LIBZE_ERROR_ZFS_OPEN if dataset could not be opened
  */
 libze_error
-libze_rename(libze_handle *lzeh, char const boot_environment[static 1],
-             char const new_boot_environment[static 1]) {
+libze_rename(libze_handle *lzeh, char const boot_environment[],
+             char const new_boot_environment[]) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
     zfs_handle_t *be_zh = NULL, *be_bpool_zh = NULL;
@@ -2659,7 +2659,7 @@ libze_set(libze_handle *lzeh, nvlist_t *properties) {
  * @return @p LIBZE_ERROR_SUCCESS on success
  */
 libze_error
-libze_snapshot(libze_handle *lzeh, char const boot_environment[static 1]) {
+libze_snapshot(libze_handle *lzeh, char const boot_environment[]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
     char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
@@ -2765,7 +2765,7 @@ unmount_callback(zfs_handle_t *zh, void *data) {
  * @return @p LIBZE_ERROR_SUCCESS on success
  */
 libze_error
-libze_unmount(libze_handle *lzeh, char const boot_environment[static 1]) {
+libze_unmount(libze_handle *lzeh, char const boot_environment[]) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
     zfs_handle_t *be_zh = NULL, *be_bpool_zh = NULL;
     char be_ds[ZFS_MAX_DATASET_NAME_LEN] = "";
