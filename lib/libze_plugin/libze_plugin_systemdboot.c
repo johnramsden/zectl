@@ -648,8 +648,7 @@ err:
  * @brief Run mid-activate hook
  *
  * @param lzeh Initialized libze handle
- * @param be_mountpoint
- * @param be_name New be to activate
+ * @param activate_data New be to activate
  *
  * @return Non-zero on failure
  */
@@ -1111,7 +1110,7 @@ replace_be_name(libze_handle *lzeh, char const be_name[ZFS_MAX_DATASET_NAME_LEN]
  *        Copies kernels from BE being cloned
  *
  * @param[in,out] lzeh  libze handle
- * @param[in] be_name   BE being created
+    * @param[in] create_data   BE being created
  *
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_MAXPATHLEN if bootfs exceeds max path length,
