@@ -12,7 +12,11 @@ include_directories(include)
 include(FindZFS)
 include(FindCheck)
 
-add_compile_definitions(DEBUG=0)
+if (CMAKE_VERSION VERSION_LESS 3.12)
+    add_definitions(-DDEBUG=0)
+else()
+    add_compile_definitions(DEBUG=0)
+endif()
 
 add_subdirectory(lib)
 add_subdirectory(src)
