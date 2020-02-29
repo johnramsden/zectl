@@ -556,6 +556,10 @@ copy_cb(char const dirname[LIBZE_MAX_PATH_LEN], char const filename_suffix[LIBZE
 int
 libze_util_rmdir(char const directory_path[LIBZE_MAX_PATH_LEN]) {
 
+    if (access(directory_path, F_OK) != 0) {
+        return ENOENT;
+    }
+
     int ret = recursive_traverse(directory_path, rmdir_cb, NULL);
     if (ret != 0) {
         return ret;

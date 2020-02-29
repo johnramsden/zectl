@@ -1218,13 +1218,12 @@ remove_kernels(libze_handle *lzeh, char const efi_mountpoint[LIBZE_MAX_PATH_LEN]
     }
 
     errno = 0;
-    int interr = remove(loader_buf);
-    if (interr != 0) {
+    if ((access(loader_buf, F_OK) == 0) && (remove(loader_buf) != 0)) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to remove %s.\n", loader_buf);
     }
 
-    interr = libze_util_rmdir(kernels_buf);
-    if (interr != 0) {
+    int interr = libze_util_rmdir(kernels_buf);
+    if ((interr != ENOENT) && (interr != 0)) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to remove %s.\n", kernels_buf);
     }
 
