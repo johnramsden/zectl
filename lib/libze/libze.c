@@ -2158,6 +2158,8 @@ libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
         (lzeh->lz_funcs->plugin_post_destroy(lzeh, options->be_name) != 0)) {
         return LIBZE_ERROR_PLUGIN;
     }
+    
+    return ret;
 }
 
 /**********************************
