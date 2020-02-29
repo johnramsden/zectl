@@ -19,3 +19,11 @@ After creating a boot environment, when it is ready to be used, it is activated.
 `zectl` is written in a modular way that supports adding additional bootloaders with "plugins".
 
 `zectl` currently only has a systemdboot plugin.
+
+## Installing
+
+`zectl` is available in on Arch linux:
+* [zectl](https://aur.archlinux.org/packages/zectl/)
+* [zectl-git](https://aur.archlinux.org/packages/zectl-git/)
+
+To build manually see [BUILDING](docs/BUILDING.md)
