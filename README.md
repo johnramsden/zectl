@@ -20,6 +20,8 @@ After creating a boot environment, when it is ready to be used, it is activated.
 
 `zectl` currently only has a systemdboot plugin.
 
+See [plugins](docs/plugins/README.md)
+
 ## Installing
 
 `zectl` is available in on Arch linux:
@@ -27,3 +29,9 @@ After creating a boot environment, when it is ready to be used, it is activated.
 * [zectl-git](https://aur.archlinux.org/packages/zectl-git/)
 
 To build manually see [BUILDING](docs/BUILDING.md)
+
+## System Setup
+
+See:
+* [System Setup](docs/SYSTEM_SETUP.md)
+* [plugins](docs/plugins/README.md)
