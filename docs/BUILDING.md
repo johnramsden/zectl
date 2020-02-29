@@ -21,4 +21,4 @@ make
 make DESTDIR="release/" install
 ```
 
-The files can no be copied to the system locations.
+The files can now be copied to the system locations.
