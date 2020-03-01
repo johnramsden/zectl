@@ -11,7 +11,7 @@ ze_unmount(libze_handle *lzeh, int argc, char **argv) {
     while ((opt = getopt(argc, argv, "")) != -1) {
         switch (opt) {
             default:
-                fprintf(stderr, "%s destroy: unknown option '-%c'\n", ZE_PROGRAM, optopt);
+                fprintf(stderr, "%s unmount: unknown option '-%c'\n", ZE_PROGRAM, optopt);
                 ze_usage();
                 return LIBZE_ERROR_UNKNOWN;
         }

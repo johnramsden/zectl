@@ -32,15 +32,15 @@ void
 ze_usage(void) {
     puts("\nUsage:");
     printf("%s activate <boot environment>\n", ZE_PROGRAM);
-    printf("%s create <boot environment>\n", ZE_PROGRAM);
-    printf("%s destroy <boot environment>\n", ZE_PROGRAM);
-    printf("%s get <property>\n", ZE_PROGRAM);
+    printf("%s create [ -e <existing> | <existing@snapshot> ] [ -r ] <boot-environment>\n", ZE_PROGRAM);
+    printf("%s destroy [ -F ] <boot-environment>\n", ZE_PROGRAM);
+    printf("%s get [ -H ] [ property ]\n", ZE_PROGRAM);
     printf("%s list\n", ZE_PROGRAM);
     printf("%s mount <boot environment>\n", ZE_PROGRAM);
-    printf("%s rename <boot environment> <boot environment>\n", ZE_PROGRAM);
-    printf("%s set <property=value>\n", ZE_PROGRAM);
-    printf("%s snapshot <boot environment>@<snap>\n", ZE_PROGRAM);
-    printf("%s unmount <boot environment>\n", ZE_PROGRAM);
+    printf("%s rename <boot-environment> <boot-environment-new>\n", ZE_PROGRAM);
+    printf("%s set <property>=<value>\n", ZE_PROGRAM);
+    printf("%s snapshot <boot-environment>@<snapshot>\n", ZE_PROGRAM);
+    printf("%s unmount <boot-environment>\n", ZE_PROGRAM);
 }
 
 /*
