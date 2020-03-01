@@ -26,4 +26,7 @@ build() {
 package() {
     cd "${srcdir}/${pkgname}/build"
     make DESTDIR="${pkgdir}" install
+    install -Dm644 "${srcdir}/${pkgname}/docs/zectl.8" "${pkgdir}/usr/share/man/man8/zectl.8"
+    install -Dm644 "${srcdir}/${pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+    install -Dm644 "${srcdir}/${pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-MIT"
 }
