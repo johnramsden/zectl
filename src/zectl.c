@@ -15,7 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 
-char const *ZE_PROGRAM = "zectl";
+char const * const ZE_PROGRAM = "zectl";
+char const * const ZECTL_VERSION = "0.0.0";
 
 /* Function pointer to command */
 typedef libze_error (*command_func)(libze_handle *lzeh, int argc, char **argv);
@@ -41,14 +42,6 @@ ze_usage(void) {
     printf("%s snapshot <boot environment>@<snap>\n", ZE_PROGRAM);
     printf("%s unmount <boot environment>\n", ZE_PROGRAM);
 }
-
-// libze_error
-// ze_get_props(libze_handle *lzeh, nvlist_t *props, nvlist_t **out_props) {
-//    if (!props) {
-//        return LIBZE_ERROR_UNKNOWN;
-//    }
-//    return libze_channel_program(lzeh, zcp_get_props, props, out_props);
-//}
 
 /*
  * Check the command matches with one of the available options.
@@ -103,6 +96,23 @@ main(int argc, char *argv[]) {
     int ret = EXIT_SUCCESS;
 
     libze_handle *lzeh = NULL;
+
+    int opt;
+    opterr = 0;
+    while ((opt = getopt(argc, argv, "vh")) != -1) {
+        switch (opt) {
+            case 'v':
+                puts(ZECTL_VERSION);
+                return EXIT_SUCCESS;
+            case 'h':
+                ze_usage();
+                return EXIT_SUCCESS;
+            default:
+                fprintf(stderr, "%s: unknown option '-%c'\n", ZE_PROGRAM, optopt);
+                ze_usage();
+                return LIBZE_ERROR_UNKNOWN;
+        }
+    }
 
     /* Set up all commands */
     command_map_t ze_command_map[NUM_COMMANDS] = {

@@ -17,6 +17,8 @@ zectl is a ZFS Boot Environment manager for Linux.
 .P
 .SH SYNOPSIS
 .P
+\fBzectl\fR [ -h ] [ -v ]
+.P
 \fBzectl activate\fR <boot-environment>
 .P
 \fBzectl create\fR [ -e <existing> | <existing@snapshot> ] [ -r ] <boot-environment>
@@ -39,6 +41,11 @@ zectl is a ZFS Boot Environment manager for Linux.
 .P
 .SH COMMANDS
 .P
+\fBzectl\fR [ -h ] [ -v ]
+.RS 4
+Output zectl version with \fI-v\fR, and help with \fI-h\fR.
+.P
+.RE
 \fBzectl activate\fR <boot-environment>
 .RS 4
 Activate \fIboot-environment\fR.
