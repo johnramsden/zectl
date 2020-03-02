@@ -14,7 +14,7 @@ zectl is a ZFS Boot Environment manager for Linux.
 
 *zectl activate* <boot-environment>
 
-*zectl create* [ -e <existing> | <existing@snapshot> ] [ -r ] <boot-environment>
+*zectl create* [ -e <existing-dataset> | <existing-dataset@snapshot> ] [ -r ] <boot-environment>
 
 *zectl destroy* [ -F ] <boot-environment>
 
@@ -34,13 +34,13 @@ zectl is a ZFS Boot Environment manager for Linux.
 
 # COMMANDS
 
-*zectl version
+*zectl version*
 	Print zectl version.
 
 *zectl activate* <boot-environment>
 	Activate _boot-environment_.
 
-*zectl create* [ -e <existing> | <existing@snapshot> ] [ -r ] <boot-environment>
+*zectl create* [ -e <existing-dataset> | <existing-dataset@snapshot> ] [ -r ] <boot-environment>
 	Create _boot-environment_.
 
 	_-e_ will create the new boot environment from an existing boot environment,

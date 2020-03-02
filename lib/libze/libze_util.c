@@ -69,6 +69,42 @@ libze_util_cut(char const path[static 1], size_t buflen, char buf[buflen], char 
 }
 
 /**
+ * @brief Split a string at the last instance of a delimiter
+ *
+ * @param[in] path       String to cut
+ * @param[in] buflen     Length of buffer
+ * @param[out] buf_pre   Prefix before last instance of delimiter
+ * @param[out] buf_post  Suffix after last instance of delimiter
+ * @param[in] delimiter  Delimiter to cut string at
+ *
+ * @return Non-zero if buffer is too short, or there is no instance of delimiter
+ */
+int
+libze_util_split(char const path[static 1], size_t buflen, char buf_pre[buflen],
+        char buf_post[buflen], char delimiter) {
+    char *slashp = NULL;
+
+    if (strlcpy(buf_pre, path, buflen) >= buflen) {
+        return -1;
+    }
+
+    /* Get pointer to last instance of '/' */
+    if ((slashp = strrchr(buf_pre, delimiter)) == NULL) {
+        return -1;
+    }
+
+    /* terminate string at '/' */
+    *slashp = '\0';
+    slashp++;
+
+    if (strlcpy(buf_post, slashp, buflen) >= buflen) {
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
  * @brief Given a dataset, return just the portion after the root of boot environments
  *
  * @param[in] root     Root of boot environments

@@ -32,7 +32,7 @@ void
 ze_usage(void) {
     puts("\nUsage:");
     printf("%s activate <boot environment>\n", ZE_PROGRAM);
-    printf("%s create [ -e <existing> | <existing@snapshot> ] [ -r ] <boot-environment>\n", ZE_PROGRAM);
+    printf("%s create [ -e <existing-dataset> | <existing-dataset@snapshot> ] [ -r ] <boot-environment>\n", ZE_PROGRAM);
     printf("%s destroy [ -F ] <boot-environment>\n", ZE_PROGRAM);
     printf("%s get [ -H ] [ property ]\n", ZE_PROGRAM);
     printf("%s list\n", ZE_PROGRAM);
