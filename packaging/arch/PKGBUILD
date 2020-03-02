@@ -8,7 +8,7 @@ url="http://github.com/johnramsden/${pkgname}"
 arch=('any')
 license=('MIT')
 depends=('zfs')
-makedepends=('make' 'cmake' 'check')
+makedepends=('make' 'cmake')
 conflicts=("${pkgname}-git")
 
 source=(${pkgname}-${pkgver}.tar.gz)

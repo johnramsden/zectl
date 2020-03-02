@@ -2,7 +2,7 @@
 
 * ZFS
 * `cmake` 3.10+
-* `check` library
+* `check` library (if running tests)
 
 ## Building
 
@@ -14,6 +14,8 @@ To setup the build and set `PLUGINS_DIRECTORY`, starting from the source root:
 mkdir build && cd build
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DPLUGINS_DIRECTORY=/usr/share/zectl/libze_plugin
 ```
+
+To run tests add `-DBUILD_TESTING=1`.
 
 To compile and install to a subdirectory `release`:
 
