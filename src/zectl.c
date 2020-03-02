@@ -41,6 +41,7 @@ ze_usage(void) {
     printf("%s set <property>=<value>\n", ZE_PROGRAM);
     printf("%s snapshot <boot-environment>@<snapshot>\n", ZE_PROGRAM);
     printf("%s unmount <boot-environment>\n", ZE_PROGRAM);
+    printf("%s version\n", ZE_PROGRAM);
 }
 
 /*
@@ -97,23 +98,6 @@ main(int argc, char *argv[]) {
 
     libze_handle *lzeh = NULL;
 
-    int opt;
-    opterr = 0;
-    while ((opt = getopt(argc, argv, "vh")) != -1) {
-        switch (opt) {
-            case 'v':
-                puts(ZECTL_VERSION);
-                return EXIT_SUCCESS;
-            case 'h':
-                ze_usage();
-                return EXIT_SUCCESS;
-            default:
-                fprintf(stderr, "%s: unknown option '-%c'\n", ZE_PROGRAM, optopt);
-                ze_usage();
-                return LIBZE_ERROR_UNKNOWN;
-        }
-    }
-
     /* Set up all commands */
     command_map_t ze_command_map[NUM_COMMANDS] = {
         /* If commands are added or removed, must modify 'NUM_COMMANDS' */
@@ -141,6 +125,11 @@ main(int argc, char *argv[]) {
     //            return EXIT_FAILURE;
     //        }
     //    }
+
+    if (strcmp(ze_argv[0], "version") == 0) {
+        puts(ZECTL_VERSION);
+        return EXIT_SUCCESS;
+    }
 
     if ((lzeh = libze_init()) == NULL) {
         fprintf(stderr,
