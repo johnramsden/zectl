@@ -1,7 +1,8 @@
 ## Requirements
 
-* zfs
-* cmake 3.10+
+* ZFS
+* `cmake` 3.10+
+* `check` library
 
 ## Building
 
