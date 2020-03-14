@@ -1110,7 +1110,7 @@ replace_be_name(libze_handle *lzeh, char const be_name[ZFS_MAX_DATASET_NAME_LEN]
  *        Copies kernels from BE being cloned
  *
  * @param[in,out] lzeh  libze handle
-    * @param[in] create_data   BE being created
+ * @param[in] create_data   BE being created
  *
  * @return @p LIBZE_ERROR_SUCCESS on success,
  *         @p LIBZE_ERROR_MAXPATHLEN if bootfs exceeds max path length,
@@ -1269,6 +1269,86 @@ libze_plugin_systemdboot_post_destroy(libze_handle *lzeh, char const be_name[LIB
     }
 
     ret = remove_kernels(lzeh, efi_mountpoint, be_name);
+
+    return ret;
+}
+
+/********************************************************************
+ ************************** Post-rename ****************************
+ ********************************************************************/
+
+/**
+ * @brief Post-rename hook
+ *        Renames loader entry
+ *        Renames kernels directory
+ *
+ * @param[in,out] lzeh      libze handle
+ * @param[in] be_name_old   Boot environment to be renamed
+ * @param[in] be_name_new   New boot environment name
+ *
+ * @return     @p LIBZE_ERROR_MAXPATHLEN if path length exceeded
+ *             @p LIBZE_ERROR_UNKNOWN if rename, or delete fails
+ *             @p LIBZE_ERROR_UNKNOWN if systemdboot:efi property couldn't be accessed
+ *             @p LIBZE_ERROR_SUCCESS on success
+ */
+libze_error
+libze_plugin_systemdboot_post_rename(libze_handle *lzeh, char const be_name_old[LIBZE_MAX_PATH_LEN],
+                                     char const be_name_new[LIBZE_MAX_PATH_LEN]) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    char efi_mountpoint[ZFS_MAXPROPLEN];
+    char namespace_buf[ZFS_MAXPROPLEN];
+    char loader_buf_old[ZFS_MAXPROPLEN];
+    char loader_buf_new[ZFS_MAXPROPLEN];
+
+    libze_plugin_manager_error per = libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf);
+    if (per != LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "Exceeded max property name length.\n");
+    }
+
+    ret = libze_be_prop_get(lzeh, efi_mountpoint, "efi", namespace_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                               "Couldn't access systemdboot:efi property.\n");
+    }
+
+    ret = form_loader_entry_path(efi_mountpoint, "env", be_name_old, loader_buf_old);
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        ret = form_loader_entry_path(efi_mountpoint, "env", be_name_new, loader_buf_new);
+    }
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "BE loader path exceeds max path length.\n");
+    }
+
+    int iret = rename(loader_buf_old, loader_buf_new);
+
+    if (iret != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to rename %s to %s.\n",
+                               loader_buf_old, loader_buf_new);
+    }
+
+    ret = form_loader_entry_config(efi_mountpoint, be_name_old, loader_buf_old);
+    if (ret == LIBZE_ERROR_SUCCESS) {
+        ret = form_loader_entry_config(efi_mountpoint, be_name_new, loader_buf_new);
+    }
+
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                               "BE loader path exceeds max path length.\n");
+    }
+
+    ret = replace_be_name(lzeh, be_name_new, be_name_old, loader_buf_old, loader_buf_new);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+    iret = remove(loader_buf_old);
+    if (iret != 0) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                               "Failed to remove old configuration %s.\n", loader_buf_old);
+    }
 
     return ret;
 }

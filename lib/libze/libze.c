@@ -2605,6 +2605,11 @@ libze_rename(libze_handle *lzeh, char const boot_environment[static 1],
         }
     }
 
+    /* Plugin - Post Rename */
+    if (lzeh->lz_funcs != NULL) {
+        ret = lzeh->lz_funcs->plugin_post_rename(lzeh, boot_environment, new_boot_environment);
+    }
+
 err:
     zfs_close(be_zh);
     if (be_bpool_zh != NULL) {
