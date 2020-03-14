@@ -1738,16 +1738,16 @@ prepare_create_from_existing(libze_handle *lzeh, char const be_source[ZFS_MAX_DA
 
     char snap_buf[ZFS_MAX_DATASET_NAME_LEN];
     (void) gen_snap_suffix(ZFS_MAX_DATASET_NAME_LEN, cdata->snap_suffix);
-    int len = libze_util_concat(be_source, "@", cdata->snap_suffix,
-            ZFS_MAX_DATASET_NAME_LEN, snap_buf);
+    int len =
+        libze_util_concat(be_source, "@", cdata->snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf);
     if (len != LIBZE_ERROR_SUCCESS) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Source dataset snapshot will exceed max dataset length.\n");
+                               "Source dataset snapshot will exceed max dataset length.\n");
     }
 
     if (zfs_snapshot(lzeh->lzh, snap_buf, cdata->recursive, NULL) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Failed to create snapshot %s.\n",
-                snap_buf);
+                               snap_buf);
     }
     // Regular dataset
     if (!zfs_dataset_exists(lzeh->lzh, be_source, ZFS_TYPE_FILESYSTEM)) {
@@ -2173,7 +2173,7 @@ libze_destroy(libze_handle *lzeh, libze_destroy_options *options) {
         (lzeh->lz_funcs->plugin_post_destroy(lzeh, options->be_name) != 0)) {
         return LIBZE_ERROR_PLUGIN;
     }
-    
+
     return ret;
 }
 
@@ -2670,24 +2670,26 @@ libze_snapshot(libze_handle *lzeh, char const boot_environment[static 1]) {
     char boot_environment_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
 
     if (strchr(boot_environment, '@') != NULL) {
-        ret = libze_util_split(
-                boot_environment, ZFS_MAX_DATASET_NAME_LEN, boot_environment_buf, snap_suffix, '@');
+        ret = libze_util_split(boot_environment, ZFS_MAX_DATASET_NAME_LEN, boot_environment_buf,
+                               snap_suffix, '@');
         if (ret != LIBZE_ERROR_SUCCESS) {
-            return libze_error_prepend(
-                    lzeh, ret, "Failed parsing snapshot (%s).\n", boot_environment);
+            return libze_error_prepend(lzeh, ret, "Failed parsing snapshot (%s).\n",
+                                       boot_environment);
         }
     } else {
-        if (strlcpy(boot_environment_buf, boot_environment, ZFS_MAX_DATASET_NAME_LEN) >= ZFS_MAX_DATASET_NAME_LEN) {
-            return libze_error_prepend(
-                    lzeh, ret, "Failed parsing dataset (%s).\n", boot_environment);
+        if (strlcpy(boot_environment_buf, boot_environment, ZFS_MAX_DATASET_NAME_LEN) >=
+            ZFS_MAX_DATASET_NAME_LEN) {
+            return libze_error_prepend(lzeh, ret, "Failed parsing dataset (%s).\n",
+                                       boot_environment);
         }
         (void) gen_snap_suffix(ZFS_MAX_DATASET_NAME_LEN, snap_suffix);
     }
 
     if ((ret = validate_existing_be(lzeh, boot_environment_buf, be_ds, be_bpool_ds)) !=
         LIBZE_ERROR_SUCCESS) {
-        return libze_error_prepend(
-            lzeh, ret, "Failed validating boot environment (%s) for snapshot.\n", boot_environment_buf);
+        return libze_error_prepend(lzeh, ret,
+                                   "Failed validating boot environment (%s) for snapshot.\n",
+                                   boot_environment_buf);
     }
 
     if (libze_util_concat(be_ds, "@", snap_suffix, ZFS_MAX_DATASET_NAME_LEN, snap_buf) !=

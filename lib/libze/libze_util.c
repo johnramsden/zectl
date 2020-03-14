@@ -81,7 +81,7 @@ libze_util_cut(char const path[static 1], size_t buflen, char buf[buflen], char 
  */
 int
 libze_util_split(char const path[static 1], size_t buflen, char buf_pre[buflen],
-        char buf_post[buflen], char delimiter) {
+                 char buf_post[buflen], char delimiter) {
     char *slashp = NULL;
 
     if (strlcpy(buf_pre, path, buflen) >= buflen) {

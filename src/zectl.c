@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 
-char const * const ZE_PROGRAM = "zectl";
-char const * const ZECTL_VERSION = "0.0.0";
+char const *const ZE_PROGRAM = "zectl";
+char const *const ZECTL_VERSION = "0.0.0";
 
 /* Function pointer to command */
 typedef libze_error (*command_func)(libze_handle *lzeh, int argc, char **argv);
@@ -32,7 +32,9 @@ void
 ze_usage(void) {
     puts("\nUsage:");
     printf("%s activate <boot environment>\n", ZE_PROGRAM);
-    printf("%s create [ -e <existing-dataset> | <existing-dataset@snapshot> ] [ -r ] <boot-environment>\n", ZE_PROGRAM);
+    printf("%s create [ -e <existing-dataset> | <existing-dataset@snapshot> ] [ -r ] "
+           "<boot-environment>\n",
+           ZE_PROGRAM);
     printf("%s destroy [ -F ] <boot-environment>\n", ZE_PROGRAM);
     printf("%s get [ -H ] [ property ]\n", ZE_PROGRAM);
     printf("%s list\n", ZE_PROGRAM);
