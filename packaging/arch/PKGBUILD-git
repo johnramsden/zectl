@@ -2,7 +2,7 @@
 
 pkgname=zectl-git
 _pkgname=${pkgname%-git}
-pkgver=
+pkgver=0
 pkgrel=1
 pkgdesc="ZFS Boot Environment manager."
 url="http://github.com/johnramsden/${_pkgname}"
