@@ -18,3 +18,9 @@ have any child datasets that are not in a boot environment.
 The common practice is to start with a 'default' boot environment. This would
 be the dataset `<pool>/ROOT/default`. If a system is setup in this
 manner, it would be the most basic boot environment compatible system.
+
+Make sure the boot environment is set as the bootfs:
+
+```shell script
+zpool set bootfs="<pool>/ROOT/default" "<pool>"
+```
