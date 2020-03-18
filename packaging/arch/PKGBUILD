@@ -14,7 +14,7 @@ conflicts=("${pkgname}-git")
 source=(${pkgname}-${pkgver}.tar.gz)
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/johnramsden/${pkgname}/archive/v${pkgver}.tar.gz")
 
-sha256sums=(SKIP)
+sha256sums=('d3612803043761113ac1e7c6a34f27f5c22a2f175dc93d255de47805281a6a30')
 
 build() {
     cd "${srcdir}/${pkgname}-${pkgver}"
@@ -24,9 +24,9 @@ build() {
 }
 
 package() {
-    cd "${srcdir}/${pkgname}/build"
+    cd "${srcdir}/${pkgname}-${pkgver}/build"
     make DESTDIR="${pkgdir}" install
-    install -Dm644 "${srcdir}/${pkgname}/docs/zectl.8" "${pkgdir}/usr/share/man/man8/zectl.8"
-    install -Dm644 "${srcdir}/${pkgname}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
-    install -Dm644 "${srcdir}/${pkgname}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-MIT"
+    install -Dm644 "${srcdir}/${pkgname}-${pkgver}/docs/zectl.8" "${pkgdir}/usr/share/man/man8/zectl.8"
+    install -Dm644 "${srcdir}/${pkgname}-${pkgver}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+    install -Dm644 "${srcdir}/${pkgname}-${pkgver}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-MIT"
 }
