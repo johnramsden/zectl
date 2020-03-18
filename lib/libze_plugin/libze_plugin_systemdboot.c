@@ -714,7 +714,7 @@ get_loader_line_from_regex(libze_handle *lzeh, void *data, char const line[LIBZE
 
     char replace_two[LIBZE_MAX_PATH_LEN] = "";
 
-    int rlen = snprintf(replace_two, LIBZE_MAX_PATH_LEN, "\\1%s-%s\n", SYSTEMDBOOT_ENTRY_PREFIX,
+    int rlen = snprintf(replace_two, LIBZE_MAX_PATH_LEN, "\\1%s-%s.conf\n", SYSTEMDBOOT_ENTRY_PREFIX,
                         rmd->be_name);
     if (rlen >= LIBZE_MAX_PATH_LEN) {
         ret = libze_error_set(lzeh, ret, "Exceeded max path length for regex buffer.\n");
