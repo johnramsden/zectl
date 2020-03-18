@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(zectl C)
+project(zectl LANGUAGES C VERSION 0.1.0 DESCRIPTION "ZE ZFS library")
+
 set (CMAKE_C_STANDARD 11)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMakeModules/")

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(libze VERSION 0.0.0 DESCRIPTION "ZE SFS library")
+project(libze LANGUAGES C VERSION 0.1.0 DESCRIPTION "ZE ZFS library")
 
 set(LIBZE_SOURCE_FILES
         libze.c system_linux.c system_linux.h
