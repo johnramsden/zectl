@@ -2,7 +2,7 @@
 
 [![MIT license](http://img.shields.io/badge/license-MIT-brightgreen.svg)](http://opensource.org/licenses/MIT)
 
-[![Gitter chat](https://badges.gitter.im/johnramsden/zectl.png)](https://gitter.im/zectl "Gitter chat")
+[![Matrix Chat](https://img.shields.io/badge/chat-on%20%5Bmatrix%5D-brightgreen)](https://riot.im/app/#/room/#zectl:matrix.org "Matrix chat")
 
 ZFS Boot Environment manager
 
