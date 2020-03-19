@@ -51,7 +51,7 @@ If you would like to explicitly specify the mountpoint used, you can set the
 will use the specified location: 
 
 ```shell script
-$ zectl set systemdboot:efi=/mnt/efi
+$ zectl set systemdboot:efi=/efi
 ```
 
 Don't forget to change the mount point in `/etc/fstab`.
