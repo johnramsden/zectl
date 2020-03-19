@@ -51,7 +51,7 @@ If you would like to explicitly specify the mountpoint used, you can set the
 will use the specified location: 
 
 ```shell script
-$ zectl set systemdboot:efi=/efi
+$ zectl set systemdboot:efi=<esp>
 ```
 
 Don't forget to change the mount point in `/etc/fstab`.
@@ -104,4 +104,3 @@ the bootloader, and fstab when a new boot environment is created.
 
 It will also copy the configuration described above, replacing the currently
 activated boot environment's configuration with the new boot environments name.
-
