@@ -24,3 +24,10 @@ Make sure the boot environment is set as the bootfs:
 ```shell script
 zpool set bootfs="<pool>/ROOT/default" "<pool>"
 ```
+
+If you have any existing boot environments, make sure they have the property
+`canmount=noauto` set.
+
+```shell script
+zfs set canmount=noauto "<pool>/ROOT/<be>"
+```
