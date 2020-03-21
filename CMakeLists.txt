@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(zectl LANGUAGES C VERSION 0.1.0 DESCRIPTION "ZE ZFS library")
+project(zectl LANGUAGES C VERSION 0.1.1 DESCRIPTION "BE Manager")
 
 set (CMAKE_C_STANDARD 11)
 

@@ -16,7 +16,7 @@
 #include <string.h>
 
 char const *const ZE_PROGRAM = "zectl";
-char const *const ZECTL_VERSION = "0.1.0";
+char const *const ZECTL_VERSION = "0.1.1";
 
 /* Function pointer to command */
 typedef libze_error (*command_func)(libze_handle *lzeh, int argc, char **argv);
