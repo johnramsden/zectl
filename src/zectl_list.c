@@ -105,16 +105,16 @@ print_bes(nvlist_t **bootenvs, list_options_t *options) {
         }
 
         char active_buff[3] = "";
-        boolean_t nextboot;
-        if (nvlist_lookup_boolean_value(be_props, "nextboot", &nextboot) == 0) {
-            if (nextboot) {
-                strcat(active_buff, "R");
-            }
-        }
         boolean_t active;
         if (nvlist_lookup_boolean_value(be_props, "active", &active) == 0) {
             if (active) {
                 strcat(active_buff, "N");
+            }
+        }
+        boolean_t nextboot;
+        if (nvlist_lookup_boolean_value(be_props, "nextboot", &nextboot) == 0) {
+            if (nextboot) {
+                strcat(active_buff, "R");
             }
         }
         printf("%-*s%s", (int) widths.active, active_buff, tab_suffix);
