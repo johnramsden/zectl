@@ -866,8 +866,8 @@ temp_unmount_be(libze_handle *lzeh, char const *tmp_dirname, zfs_handle_t *be_zh
  *
  * @param[in,out] lzeh        libze handle
  * @param[in] be_name         Boot environment name
- * @param[out] tmp_dirname    Directory to unmount be from
  * @param[in] be_zh           Handle to be
+ * @param[in] tmp_dirname     Directory to mount be to
  *
  * @return @p LIBZE_ERROR_SUCCESS on success, or @p LIBZE_ERROR_UNKNOWN on failure
  */

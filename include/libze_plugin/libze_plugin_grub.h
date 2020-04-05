@@ -23,12 +23,17 @@ libze_plugin_grub_post_destroy(libze_handle *lzeh, char const be_name[LIBZE_MAX_
 libze_error
 libze_plugin_grub_post_create(libze_handle *lzeh, libze_create_data *create_data);
 
+libze_error
+libze_plugin_grub_post_rename(libze_handle *lzeh, char const be_name_old[LIBZE_MAX_PATH_LEN],
+                              char const be_name_new[LIBZE_MAX_PATH_LEN]);
+
 libze_plugin_fn_export const exported_plugin = {
     .plugin_init = libze_plugin_grub_init,
     .plugin_pre_activate = libze_plugin_grub_pre_activate,
     .plugin_mid_activate = libze_plugin_grub_mid_activate,
     .plugin_post_activate = libze_plugin_grub_post_activate,
     .plugin_post_destroy = libze_plugin_grub_post_destroy,
-    .plugin_post_create = libze_plugin_grub_post_create};
+    .plugin_post_create = libze_plugin_grub_post_create,
+    .plugin_post_rename = libze_plugin_grub_post_rename};
 
 #endif // ZECTL_LIBZE_PLUGIN_GRUB_H

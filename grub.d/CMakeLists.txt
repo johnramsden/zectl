@@ -1,7 +1,8 @@
-project(grub_generator C CXX)
+project(grub_generator C)
 
-set(CMAKE_CXX_STANDARD 11)
-set(SOURCES grub_generator.cpp)
+set (CMAKE_C_STANDARD 11)
+
+set(SOURCES grub_generator.c)
 
 set(PLUGINS_DIRECTORY "" CACHE STRING "Plugins directory")
 if(NOT PLUGINS_DIRECTORY)

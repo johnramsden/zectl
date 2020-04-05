@@ -4,5 +4,9 @@
         "args": [
             "list"
         ]
+    },
+    "C_Cpp.default.configurationProvider": "go2sh.cmake-integration",
+    "files.associations": {
+        "stdio.h": "c"
     }
 }

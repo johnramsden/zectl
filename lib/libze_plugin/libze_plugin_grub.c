@@ -126,13 +126,6 @@ libze_plugin_grub_post_activate(libze_handle *lzeh, char const be_name[LIBZE_MAX
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    char active_be[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Bootfs exceeds max path length.\n");
-    }
-
-    char efi_mountpoint[ZFS_MAXPROPLEN];
-    char namespace_buf[ZFS_MAXPROPLEN];
 
     return ret;
 }
@@ -156,17 +149,6 @@ libze_error
 libze_plugin_grub_post_create(libze_handle *lzeh, libze_create_data *create_data) {
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
-    int iret = 0;
-
-    char active_be[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Bootfs exceeds max path length.\n");
-    }
-
-    char boot_mountpoint[ZFS_MAXPROPLEN];
-    char efi_mountpoint[ZFS_MAXPROPLEN];
-
-    char namespace_buf[ZFS_MAXPROPLEN];
     return ret;
 }
 
@@ -192,27 +174,32 @@ libze_plugin_grub_post_destroy(libze_handle *lzeh, char const be_name[LIBZE_MAX_
 
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    char active_be[ZFS_MAX_DATASET_NAME_LEN];
-    if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Bootfs exceeds max path length.\n");
-    }
 
-    char efi_mountpoint[ZFS_MAXPROPLEN];
-    char namespace_buf[ZFS_MAXPROPLEN];
+    return ret;
+}
 
-    libze_plugin_manager_error per = libze_plugin_form_namespace(PLUGIN_GRUB, namespace_buf);
-    if (per != LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                               "Exceeded max property name length.\n");
-    }
+/********************************************************************
+ ************************** Post-rename ****************************
+ ********************************************************************/
 
-    ret = libze_be_prop_get(lzeh, efi_mountpoint, "efi", namespace_buf);
-    if (ret != LIBZE_ERROR_SUCCESS) {
-        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
-                               "Couldn't access grub:efi property.\n");
-    }
+/**
+ * @brief Post-rename hook
+ *        Renames loader entry
+ *        Renames kernels directory
+ *
+ * @param[in,out] lzeh      libze handle
+ * @param[in] be_name_old   Boot environment to be renamed
+ * @param[in] be_name_new   New boot environment name
+ *
+ * @return     @p LIBZE_ERROR_MAXPATHLEN if path length exceeded
+ *             @p LIBZE_ERROR_UNKNOWN if rename, or delete fails
+ *             @p LIBZE_ERROR_UNKNOWN if systemdboot:efi property couldn't be accessed
+ *             @p LIBZE_ERROR_SUCCESS on success
+ */
+libze_error
+libze_plugin_grub_post_rename(libze_handle *lzeh, char const be_name_old[LIBZE_MAX_PATH_LEN],
+                              char const be_name_new[LIBZE_MAX_PATH_LEN]) {
 
-    // ret = remove_kernels(lzeh, efi_mountpoint, be_name);
-
+    libze_error ret = LIBZE_ERROR_SUCCESS;
     return ret;
 }
