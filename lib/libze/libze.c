@@ -971,12 +971,12 @@ libze_boot_pool_set(libze_handle *lzeh) {
 
     // NOTE constant string
     char bpool_root_path[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if ((ret = libze_be_prop_get(lzeh, bpool_root_path, "bootpool_root", ZE_PROP_NAMESPACE)) !=
+    if ((ret = libze_be_prop_get(lzeh, bpool_root_path, "bootpoolroot", ZE_PROP_NAMESPACE)) !=
         LIBZE_ERROR_SUCCESS) {
         return ret;
     }
     char boot_prefix[ZFS_MAX_DATASET_NAME_LEN] = "";
-    if ((ret = libze_be_prop_get(lzeh, boot_prefix, "bootpool_prefix", ZE_PROP_NAMESPACE)) !=
+    if ((ret = libze_be_prop_get(lzeh, boot_prefix, "bootpoolprefix", ZE_PROP_NAMESPACE)) !=
         LIBZE_ERROR_SUCCESS) {
         return ret;
     }

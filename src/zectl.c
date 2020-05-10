@@ -75,8 +75,8 @@ define_default_props(libze_handle *lzeh) {
         return -1;
     }
     if ((libze_default_prop_add(&default_props, "bootloader", "", ZE_PROP_NAMESPACE) != 0) ||
-        (libze_default_prop_add(&default_props, "bootpool_root", "", ZE_PROP_NAMESPACE) != 0) ||
-        (libze_default_prop_add(&default_props, "bootpool_prefix", "", ZE_PROP_NAMESPACE) != 0)) {
+        (libze_default_prop_add(&default_props, "bootpoolroot", "", ZE_PROP_NAMESPACE) != 0) ||
+        (libze_default_prop_add(&default_props, "bootpoolprefix", "", ZE_PROP_NAMESPACE) != 0)) {
         return -1;
     }
 
