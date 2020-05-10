@@ -20,6 +20,7 @@ typedef struct libze_activate_data {
 typedef struct libze_create_data {
     char const *const be_mountpoint;
     char const *const be_name;
+    boolean_t from_snapshot;
 } libze_create_data;
 
 typedef libze_error (*plugin_fn_init)(libze_handle *lzeh);

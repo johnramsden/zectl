@@ -12,13 +12,13 @@
 #define SYSTEMDBOOT_ENTRY_PREFIX "org.zectl"
 
 #define NUM_SYSTEMDBOOT_PROPERTY_VALUES 2
-#define NUM_SYSTEMDBOOT_PROPERTIES 2
+#define NUM_SYSTEMDBOOT_PROPERTIES 3
 
 /**
  * @brief list of systemdboot plugin properties
  */
 char const *systemdboot_properties[NUM_SYSTEMDBOOT_PROPERTIES][NUM_SYSTEMDBOOT_PROPERTY_VALUES] = {
-    {"efi", "/efi"}, {"boot", "/boot"}};
+    {"efi", "/efi"}, {"boot", "/boot"}, {"kernelsnapshotdirectory", "/zectl/systemdboot"}};
 
 /**
  * @struct replace_matched_data
