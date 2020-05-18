@@ -2708,6 +2708,21 @@ libze_snapshot(libze_handle *lzeh, char const boot_environment[static 1]) {
         }
     }
 
+    libze_snap_data sd = {
+        .be_name = boot_environment_buf,
+        .is_root = B_FALSE
+    };
+
+    /* Plugin - Pre snapshot */
+    if (lzeh->lz_funcs != NULL) {
+        if (libze_is_root_be(lzeh, be_ds)) {
+            sd.is_root = B_TRUE;
+        }
+        if ((ret = lzeh->lz_funcs->plugin_pre_snapshot(lzeh, &sd)) != LIBZE_ERROR_SUCCESS) {
+            return ret;
+        }
+    }
+
     if (zfs_snapshot(lzeh->lzh, snap_buf, B_TRUE, NULL) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to take snapshot (%s).\n",
                                snap_buf);

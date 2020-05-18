@@ -1352,3 +1352,34 @@ libze_plugin_systemdboot_post_rename(libze_handle *lzeh, char const be_name_old[
 
     return ret;
 }
+
+libze_error
+libze_plugin_systemdboot_pre_snapshot(libze_handle *lzeh, libze_snap_data *snap_data) {
+    libze_error  ret = LIBZE_ERROR_SUCCESS;
+
+    char mountpoint_buf[LIBZE_MAX_PATH_LEN] = "";
+
+    if (snap_data->is_root) {
+        (void) strlcat(mountpoint_buf, "/", LIBZE_MAX_PATH_LEN);
+    } else {
+        /* Get temporary mountpoint and place in mountpoint_buf */
+        ret = libze_mount(lzeh, snap_data->be_name, NULL, mountpoint_buf);
+        if (ret != LIBZE_ERROR_SUCCESS) {
+            return ret;
+        }
+    }
+
+    /* Copy the following for that environment to $kernelsnapshotdirectory.
+     *  $esp/env/org.zectl-$be -> $kernelsnapshotdirectory/env/boot
+     *  $esp/loader/entries/org.zectl-$be.conf -> $kernelsnapshotdirectory/loader/entries/org.zectl-%ZECTLBE%.conf
+     */
+
+    if (!snap_data->is_root) {
+        ret = libze_unmount(lzeh, snap_data->be_name);
+        if (ret != LIBZE_ERROR_SUCCESS) {
+            return ret;
+        }
+    }
+
+    return ret;
+}
