@@ -14,7 +14,7 @@
 libze_error
 ze_create(libze_handle *lzeh, int argc, char **argv) {
 
-    libze_bootloader bootloader;
+    libze_bootloader bootloader = { 0 };
 
     libze_create_options be_clone = {.existing = B_FALSE, .recursive = B_FALSE};
 
