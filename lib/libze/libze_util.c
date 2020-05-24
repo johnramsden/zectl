@@ -610,6 +610,56 @@ libze_util_rmdir(char const directory_path[LIBZE_MAX_PATH_LEN]) {
 }
 
 /**
+ * @brief Create a directory recursively
+ *
+ * @param directory_path Directory to remove
+ * @return 0 on success else appropriate error as returned by errno
+ */
+int
+libze_util_mkdir(char const directory_path[LIBZE_MAX_PATH_LEN], mode_t mode) {
+    char path_buf[LIBZE_MAX_PATH_LEN];
+    (void) strlcpy(path_buf, directory_path, LIBZE_MAX_PATH_LEN);
+
+    struct stat newdir_st;
+
+    for (char * p = strchr(path_buf + 1, '/'); p; p = strchr(p + 1, '/')) {
+        /* Split at slash */
+        *p = '\0';
+
+        /* Create destination directory. */
+        int err = mkdir(path_buf, mode);
+        if (err != 0) {
+            errno = 0;
+            if (stat(path_buf, &newdir_st) != 0) {
+                return errno;
+            }
+
+            if (!S_ISDIR(newdir_st.st_mode)) {
+                return ENOTDIR;
+            }
+        }
+
+        /* Restore slash */
+        *p = '/';
+    }
+
+    /* Create destination directory. */
+    int err = mkdir(path_buf, mode);
+    if (err != 0) {
+        errno = 0;
+        if (stat(path_buf, &newdir_st) != 0) {
+            return errno;
+        }
+
+        if (!S_ISDIR(newdir_st.st_mode)) {
+            return ENOTDIR;
+        }
+    }
+
+    return 0;
+}
+
+/**
  * @brief Copy a directory recursively
  *
  * @param directory_path Directory to copy
