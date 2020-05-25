@@ -25,7 +25,7 @@ libze_bootloader_init(libze_handle *lzeh, libze_bootloader *bootloader,
         return LIBZE_ERROR_UNKNOWN;
     }
 
-    if (nvlist_lookup_nvlist(out_props, prop, &bootloader->prop) != 0) {
+    if (nvlist_lookup_nvlist(out_props, prop, &bootloader->prop) == 0) {
         bootloader->set = B_TRUE;
     }
 
