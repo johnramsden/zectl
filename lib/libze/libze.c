@@ -2271,7 +2271,7 @@ libze_list_cb(zfs_handle_t *zhdl, void *data) {
     fnvlist_add_boolean_value(props, "nextboot", is_nextboot);
 
     // Active
-    boolean_t is_active = (is_mounted == 0) && (strcmp(mountpoint, "/") == 0);
+    boolean_t is_active = (is_mounted == 0) && (strcmp(cbd->lzeh->env_running_path, dataset) == 0);
     fnvlist_add_boolean_value(props, "active", is_active);
 
     fnvlist_add_nvlist(*cbd->outnvl, prop_buffer, props);
