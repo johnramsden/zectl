@@ -1353,6 +1353,20 @@ libze_plugin_systemdboot_post_rename(libze_handle *lzeh, char const be_name_old[
     return ret;
 }
 
+/**
+ * @brief Pre snapshot hook
+ *        Mounts the dataset being snapshotted (if it is not the currently mounted dataset).
+ *        Copies the following for that environment to $kernelsnapshotdirectory.
+ *           $esp/env/org.zectl-$be -> $kernelsnapshotdirectory/env/boot
+ *           $esp/loader/entries/org.zectl-$be.conf -> $kernelsnapshotdirectory/loader/entries/org.zectl-%ZECTLBE%.conf
+ *        Unmounts the dataset
+ *
+ * @param[in,out] lzeh   libze handle
+ * @param[in] snap_data  Snapshot related data
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_MAXPATHLEN on path exceeded,
+ *         @p LIBZE_ERROR_UNKNOWN otherwise
+ */
 libze_error
 libze_plugin_systemdboot_pre_snapshot(libze_handle *lzeh, libze_snap_data *snap_data) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
