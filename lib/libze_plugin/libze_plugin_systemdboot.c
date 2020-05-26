@@ -1355,12 +1355,38 @@ libze_plugin_systemdboot_post_rename(libze_handle *lzeh, char const be_name_old[
 
 libze_error
 libze_plugin_systemdboot_pre_snapshot(libze_handle *lzeh, libze_snap_data *snap_data) {
-    libze_error  ret = LIBZE_ERROR_SUCCESS;
+    libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    char mountpoint_buf[LIBZE_MAX_PATH_LEN] = "";
+    char mountpoint_buf[LIBZE_MAX_PATH_LEN];
+    char kernel_snap_dir[LIBZE_MAX_PATH_LEN];
+    char kernel_mounted_snap_dir[LIBZE_MAX_PATH_LEN];
+    char kernel_boot_dir[LIBZE_MAX_PATH_LEN];
+    char kernel_loader_dir[LIBZE_MAX_PATH_LEN];
+    char kernel_loader_conf[LIBZE_MAX_PATH_LEN];
+    char kernel_loader_conf_dest[LIBZE_MAX_PATH_LEN];
+    char kernel_dir_buf[LIBZE_MAX_PATH_LEN];
+    char efi_mountpoint[ZFS_MAXPROPLEN];
+    char namespace_buf[ZFS_MAXPROPLEN];
+
+    if (libze_plugin_form_namespace(PLUGIN_SYSTEMDBOOT, namespace_buf) !=
+        LIBZE_PLUGIN_MANAGER_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Exceeded max property name length.\n");
+    }
+
+    ret = libze_be_prop_get(lzeh, efi_mountpoint, "efi", namespace_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Couldn't access systemdboot:efi property.\n");
+    }
+    ret = libze_be_prop_get(lzeh, kernel_snap_dir, "kernelsnapshotdirectory", namespace_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
+                "Couldn't access systemdboot:kernelsnapshotdirectory property.\n");
+    }
 
     if (snap_data->is_root) {
-        (void) strlcat(mountpoint_buf, "/", LIBZE_MAX_PATH_LEN);
+        (void) strlcat(mountpoint_buf, "", LIBZE_MAX_PATH_LEN);
     } else {
         /* Get temporary mountpoint and place in mountpoint_buf */
         ret = libze_mount(lzeh, snap_data->be_name, NULL, mountpoint_buf);
@@ -1369,11 +1395,76 @@ libze_plugin_systemdboot_pre_snapshot(libze_handle *lzeh, libze_snap_data *snap_
         }
     }
 
+    if (libze_util_concat(mountpoint_buf, "", kernel_snap_dir, LIBZE_MAX_PATH_LEN, kernel_mounted_snap_dir) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Mounted BE kernelsnapshotdirectory subdirectory path exceeds max path length.\n");
+        goto err;
+    }
+
+    ret = form_loader_entry_path(efi_mountpoint, "env", snap_data->be_name, kernel_dir_buf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "BE kernel directory path exceeds max path length.\n");
+        goto err;
+    }
+    ret = form_loader_entry_config(efi_mountpoint, snap_data->be_name, kernel_loader_conf);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "BE config file path exceeds max path length.\n");
+        goto err;
+    }
+
+    /* Create destination directories. */
+
+    int iret = libze_util_concat(kernel_mounted_snap_dir, "", "/env/boot", LIBZE_MAX_PATH_LEN, kernel_boot_dir);
+    if (iret == 0) {
+        iret = libze_util_concat(kernel_mounted_snap_dir, "", "/loader/entries", LIBZE_MAX_PATH_LEN, kernel_loader_dir);
+    }
+    if (iret == 0) {
+        iret = libze_util_concat(kernel_mounted_snap_dir, "/loader/entries/", "org.zectl-%ZECTLBE%.conf", LIBZE_MAX_PATH_LEN, kernel_loader_conf_dest);
+    }
+    if (iret != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "BE kernelsnapshotdirectory subdirectory path exceeds max path length.\n");
+        goto err;
+    }
+
+    iret = libze_util_mkdir(kernel_boot_dir, 0700);
+    if (iret != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Failed to create directory (%s).\n", kernel_boot_dir);
+        goto err;
+    }
+    iret = libze_util_mkdir(kernel_loader_dir, 0700);
+    if (iret != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Failed to create directory (%s).\n", kernel_loader_dir);
+        goto err;
+    }
+
     /* Copy the following for that environment to $kernelsnapshotdirectory.
      *  $esp/env/org.zectl-$be -> $kernelsnapshotdirectory/env/boot
      *  $esp/loader/entries/org.zectl-$be.conf -> $kernelsnapshotdirectory/loader/entries/org.zectl-%ZECTLBE%.conf
      */
 
+    if (libze_util_copy_file(kernel_loader_conf, kernel_loader_conf_dest) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Failed to copy file (%s -> %s).\n", kernel_loader_conf, kernel_loader_conf_dest);
+        goto err;
+    }
+    if (libze_util_copydir(kernel_dir_buf, kernel_boot_dir) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
+                "Failed to copy directory (%s -> %s).\n", kernel_loader_conf, kernel_loader_conf_dest);
+        goto err;
+    }
+
+    /* Replace BE with %ZECTLBE% */
+    ret = replace_be_name(lzeh, "%ZECTLBE%", snap_data->be_name, kernel_loader_conf, kernel_loader_conf_dest);
+    if (ret != LIBZE_ERROR_SUCCESS) {
+        return ret;
+    }
+
+err:
     if (!snap_data->is_root) {
         ret = libze_unmount(lzeh, snap_data->be_name);
         if (ret != LIBZE_ERROR_SUCCESS) {
