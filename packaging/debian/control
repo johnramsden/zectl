@@ -1,0 +1,18 @@
+Source: zectl
+Section: admin
+Priority: optional
+Maintainer: Waqar Ahmed <waqarahmedjoyia@live.com>
+Build-Depends:
+ debhelper-compat (= 12),
+ cmake,
+ libzfslinux-dev,
+ pkgconf
+Standards-Version: 4.5.0
+Homepage: https://github.com/johnramsden/zectl
+
+Package: zectl
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends}
+Description: zectl is a ZFS boot environment manager for Linux.
