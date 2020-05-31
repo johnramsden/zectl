@@ -1130,7 +1130,7 @@ libze_plugin_systemdboot_post_create(libze_handle *lzeh, libze_create_data *crea
     if (libze_boot_env_name(lzeh->env_activated_path, ZFS_MAX_DATASET_NAME_LEN, active_be) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Bootfs exceeds max path length.\n");
     }
-
+    
     char boot_mountpoint[ZFS_MAXPROPLEN];
     char efi_mountpoint[ZFS_MAXPROPLEN];
 
@@ -1461,11 +1461,6 @@ libze_plugin_systemdboot_pre_snapshot(libze_handle *lzeh, libze_snap_data *snap_
      *  $esp/loader/entries/org.zectl-$be.conf -> $kernelsnapshotdirectory/loader/entries/org.zectl-%ZECTLBE%.conf
      */
 
-    if (libze_util_copy_file(kernel_loader_conf, kernel_loader_conf_dest) != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
-                "Failed to copy file (%s -> %s).\n", kernel_loader_conf, kernel_loader_conf_dest);
-        goto err;
-    }
     if (libze_util_copydir(kernel_dir_buf, kernel_boot_dir) != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN,
                 "Failed to copy directory (%s -> %s).\n", kernel_loader_conf, kernel_loader_conf_dest);
