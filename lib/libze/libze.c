@@ -555,9 +555,10 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
 }
 
 /**
- * @brief Get a ZFS property value from @a lzeh->ze_props
+ * @brief Get a ZFS property value from @p props
  *
  * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] props nvlist to search prop from
  * @param[out] result_prop Property of boot environment
  * @param[in] prop ZFS property looking for
  * @param[in] namespace ZFS property prefix
@@ -567,10 +568,11 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
  * @pre @p lzeh != NULL
  * @pre @p property != NULL
  * @pre @p namespace != NULL
+ * @pre @p props != NULL
  */
 libze_error
-libze_be_prop_get(libze_handle *lzeh, char *result_prop, char const *property,
-                  char const *namespace) {
+libze_nvlist_prop_get(libze_handle *lzeh, nvlist_t *props, char *result_prop, char const *property,
+                      char const *namespace) {
     nvlist_t *lookup_prop = NULL;
 
     char prop_buf[ZFS_MAXPROPLEN] = "";
@@ -579,7 +581,7 @@ libze_be_prop_get(libze_handle *lzeh, char *result_prop, char const *property,
         return libze_error_set(lzeh, LIBZE_ERROR_MAXPATHLEN, "Exceeded length of property.\n");
     }
 
-    if (nvlist_lookup_nvlist(lzeh->ze_props, prop_buf, &lookup_prop) != 0) {
+    if (nvlist_lookup_nvlist(props, prop_buf, &lookup_prop) != 0) {
         (void) strlcpy(result_prop, "", ZFS_MAXPROPLEN);
         return LIBZE_ERROR_SUCCESS;
     }
@@ -603,9 +605,15 @@ libze_be_prop_get(libze_handle *lzeh, char *result_prop, char const *property,
     return LIBZE_ERROR_SUCCESS;
 }
 
+libze_error
+libze_be_prop_get(libze_handle *lzeh, char *result_prop, char const *property,
+                  char const *namespace) {
+    return libze_nvlist_prop_get(lzeh, lzeh->ze_props, result_prop, property, namespace);
+}
+
 /**
  * @brief Get all the ZFS properties which have been set with the @p namespace prefix
- *        and return them in @a result.
+ *        and return them in @a result for provided dataset.
  *
  *        Properties in form:
  * @verbatim
@@ -624,12 +632,12 @@ libze_be_prop_get(libze_handle *lzeh, char *result_prop, char const *property,
  * @pre @p namespace != NULL
  */
 libze_error
-libze_be_props_get(libze_handle *lzeh, nvlist_t **result, char const *namespace) {
+libze_dataset_props_get(libze_handle *lzeh, nvlist_t **result, char const *dataset, char const *namespace){
     nvlist_t *user_props = NULL;
     nvlist_t *filtered_user_props = NULL;
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
-    zfs_handle_t *zhp = zfs_open(lzeh->lzh, lzeh->env_root, ZFS_TYPE_FILESYSTEM);
+    zfs_handle_t *zhp = zfs_open(lzeh->lzh, dataset, ZFS_TYPE_FILESYSTEM);
     if (zhp == NULL) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed opening handle to %s.\n",
                                lzeh->env_root);
@@ -659,6 +667,11 @@ err:
     fnvlist_free(user_props);
     fnvlist_free(filtered_user_props);
     return ret;
+}
+
+libze_error
+libze_be_props_get(libze_handle *lzeh, nvlist_t **result, char const *namespace) {
+    return libze_dataset_props_get(lzeh, result, lzeh->env_root, namespace);
 }
 
 /**
@@ -1222,6 +1235,42 @@ libze_fini(libze_handle *lzeh) {
     }
 
     free(lzeh);
+}
+
+/*********************************
+ ************** Set **************
+ *********************************/
+
+/**
+ * @brief Set a list of properties on the specified dataset
+ * @param[in] lzeh Initialized lzeh libze handle
+ * @param[in] dataset Dataset whose properties are to be updated
+ * @param[in] properties List of ZFS properties to set
+ * @return @p LIBZE_ERROR_SUCCESS on success,
+ *         @p LIBZE_ERROR_ZFS_OPEN if failure to open @p lzeh->env_root,
+ *         @p LIBZE_ERROR_UNKNOWN if failure to set properties
+ */
+libze_error
+libze_dataset_set(libze_handle *lzeh, const char *dataset, nvlist_t *properties) {
+    libze_error ret = LIBZE_ERROR_SUCCESS;
+
+    zfs_handle_t *be_root_zh = zfs_open(lzeh->lzh, dataset, ZFS_TYPE_FILESYSTEM);
+    if (be_root_zh == NULL) {
+        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN, "Failed to open %s\n",
+                               dataset);
+    }
+
+    if (zfs_prop_set_list(be_root_zh, properties) != 0) {
+        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to set properties\n");
+    }
+
+    zfs_close(be_root_zh);
+    return ret;
+}
+
+libze_error
+libze_set(libze_handle *lzeh, nvlist_t *properties) {
+    return libze_dataset_set(lzeh, lzeh->env_root, properties);
 }
 
 /**************************************
@@ -2615,36 +2664,6 @@ err:
     if (be_bpool_zh != NULL) {
         zfs_close(be_bpool_zh);
     }
-    return ret;
-}
-
-/*********************************
- ************** Set **************
- *********************************/
-
-/**
- * @brief Set a list of properties on the BE root
- * @param[in] lzeh Initialized lzeh libze handle
- * @param[in] properties List of ZFS properties to set
- * @return @p LIBZE_ERROR_SUCCESS on success,
- *         @p LIBZE_ERROR_ZFS_OPEN if failure to open @p lzeh->env_root,
- *         @p LIBZE_ERROR_UNKNOWN if failure to set properties
- */
-libze_error
-libze_set(libze_handle *lzeh, nvlist_t *properties) {
-    libze_error ret = LIBZE_ERROR_SUCCESS;
-
-    zfs_handle_t *be_root_zh = zfs_open(lzeh->lzh, lzeh->env_root, ZFS_TYPE_FILESYSTEM);
-    if (be_root_zh == NULL) {
-        return libze_error_set(lzeh, LIBZE_ERROR_ZFS_OPEN, "Failed to open BE root %s\n",
-                               lzeh->env_root);
-    }
-
-    if (zfs_prop_set_list(be_root_zh, properties) != 0) {
-        ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Failed to set properties\n");
-    }
-
-    zfs_close(be_root_zh);
     return ret;
 }
 
