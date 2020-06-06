@@ -1777,7 +1777,7 @@ prepare_create_from_existing(libze_handle *lzeh, char const be_source[ZFS_MAX_DA
  * @post if be_zh != root dataset, be_zh unmounted on exit
  */
 static libze_error
-post_create(libze_handle *lzeh, libze_create_options *options) {
+post_create(libze_handle *lzeh, libze_create_options *options, boolean_t is_snap) {
     libze_error ret = LIBZE_ERROR_SUCCESS;
 
     if (lzeh->lz_funcs == NULL) {
@@ -1806,7 +1806,11 @@ post_create(libze_handle *lzeh, libze_create_options *options) {
         }
     }
 
-    libze_create_data create_data = {.be_name = options->be_name, .be_mountpoint = tmp_dirname};
+    libze_create_data create_data = {
+            .be_name = options->be_name,
+            .be_mountpoint = tmp_dirname,
+            .from_snapshot = is_snap
+    };
 
     if (lzeh->lz_funcs->plugin_post_create(lzeh, &create_data) != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_PLUGIN, "Failed to run post-create hook\n");
@@ -1921,7 +1925,7 @@ libze_create(libze_handle *lzeh, libze_create_options *options) {
         }
     }
 
-    ret = post_create(lzeh, options);
+    ret = post_create(lzeh, options, cdata.is_snap);
 
     return ret;
 }
