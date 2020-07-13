@@ -20,7 +20,13 @@ typedef struct libze_activate_data {
 typedef struct libze_create_data {
     char const *const be_mountpoint;
     char const *const be_name;
+    boolean_t from_snapshot;
 } libze_create_data;
+
+typedef struct libze_snap_data {
+    char const *const be_name;
+    boolean_t is_root;
+} libze_snap_data;
 
 typedef libze_error (*plugin_fn_init)(libze_handle *lzeh);
 
@@ -41,6 +47,8 @@ typedef libze_error (*plugin_fn_post_rename)(libze_handle *lzeh,
                                              char const be_name_old[LIBZE_MAX_PATH_LEN],
                                              char const be_name_new[LIBZE_MAX_PATH_LEN]);
 
+typedef libze_error (*plugin_fn_pre_snapshot)(libze_handle *lzeh, libze_snap_data *snap_data);
+
 typedef struct libze_plugin_fn_export {
     plugin_fn_init plugin_init;
     plugin_fn_pre_activate plugin_pre_activate;
@@ -49,6 +57,7 @@ typedef struct libze_plugin_fn_export {
     plugin_fn_post_destroy plugin_post_destroy;
     plugin_fn_post_create plugin_post_create;
     plugin_fn_post_rename plugin_post_rename;
+    plugin_fn_pre_snapshot plugin_pre_snapshot;
 } libze_plugin_fn_export;
 
 libze_plugin_manager_error
