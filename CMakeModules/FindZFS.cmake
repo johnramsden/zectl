@@ -38,7 +38,6 @@ find_library(LIBZPOOL_LIB REQUIRED NAMES libzpool zpool)
 find_library(LIBZFS_CORE_LIB REQUIRED NAMES libzfs_core zfs_core)
 find_library(LIBNVPAIR_LIB REQUIRED NAMES libnvpair nvpair)
 find_library(LIBUUTIL_LIB REQUIRED NAMES libuutil uutil)
-find_library(LIBSPL_LIB REQUIRED NAMES libspl spl)
 
 if(LIBZFS_LIB)
     message("libzfs library found at: ${LIBZFS_LIB}")
