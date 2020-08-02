@@ -10,7 +10,6 @@
 #include "zectl.h"
 
 #include "libze/libze.h"
-#include "libze/libze_util.h"
 
 #include <stdio.h>
 #include <string.h>
