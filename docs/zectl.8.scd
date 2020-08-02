@@ -44,7 +44,7 @@ zectl is a ZFS Boot Environment manager for Linux.
 	Create _boot-environment_.
 
 	_-e_ will create the new boot environment from an existing boot environment,
-	or snapshot of an existing boot environment.
+	or snapshot of an existing boot environment - see *zectl snapshot*.
 
 	_-r_ will create a recursive boot environment.
 
@@ -83,6 +83,11 @@ zectl is a ZFS Boot Environment manager for Linux.
 
 *zectl snapshot* <boot-environment>@<snapshot>
 	Snapshot _boot-environment_.
+
+	*zectl snapshot* should be used for correct restoration of a snapshot
+	as opposed to using *zfs snapshot* directly. Some plug-ins may require extra
+	steps during the *zectl snapshot* command to ensure correct restoration via
+	*zectl create*.
 
 *zectl unmount* <boot-environment>
 	Unmount <boot-environment>. Currently booted boot environments cannot be
