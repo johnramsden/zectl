@@ -1,7 +1,7 @@
 # Maintainer: John Ramsden <johnramsden [at] riseup [dot] net>
 
 pkgname=zectl
-pkgver=0.1.1
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="ZFS Boot Environment manager."
 url="http://github.com/johnramsden/${pkgname}"
@@ -10,21 +10,23 @@ license=('MIT')
 depends=('zfs')
 makedepends=('make' 'cmake')
 conflicts=("${pkgname}-git")
+provides=("zectl")
 
-source=(${pkgname}-${pkgver}.tar.gz)
-source=("${pkgname}-${pkgver}.tar.gz::https://github.com/johnramsden/${pkgname}/archive/v${pkgver}.tar.gz")
+source=(
+    "${pkgname}-${pkgver}.tar.gz::https://github.com/johnramsden/${pkgname}/archive/v${pkgver}.tar.gz"
+)
 
 sha256sums=(SKIP) # Replace on update
 
 build() {
     cd "${srcdir}/${pkgname}-${pkgver}"
-    mkdir build && cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DPLUGINS_DIRECTORY=/usr/share/zectl/libze_plugin
-    make
+    CFLAGS+=" -fmacro-prefix-map=$PWD/=" cmake -DCMAKE_INSTALL_PREFIX=/usr \
+        -DPLUGINS_DIRECTORY=/usr/share/zectl/libze_plugin .
+    make VERBOSE=1
 }
 
 package() {
-    cd "${srcdir}/${pkgname}-${pkgver}/build"
+    cd "${srcdir}/${pkgname}-${pkgver}"
     make DESTDIR="${pkgdir}" install
     install -Dm644 "${srcdir}/${pkgname}-${pkgver}/docs/zectl.8" "${pkgdir}/usr/share/man/man8/zectl.8"
     install -Dm644 "${srcdir}/${pkgname}-${pkgver}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
