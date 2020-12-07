@@ -1,6 +1,11 @@
 #ifndef ZECTL_LIBZE_H
 #define ZECTL_LIBZE_H
 
+// Required for spl stat.h
+#define __USE_LARGEFILE64
+#define _LARGEFILE_SOURCE
+#define _LARGEFILE64_SOURCE
+
 #include "libzfs/libzfs.h"
 
 #include <stddef.h>
