@@ -2643,7 +2643,12 @@ libze_rename(libze_handle *lzeh, char const boot_environment[static 1],
     // Go ahead with rename, checks passed
 
     // No recurse, no create parents
-    if (zfs_rename(be_zh, new_be_ds, B_FALSE, B_FALSE) != 0) {
+    renameflags_t rnf = {
+            .recursive = 0,
+            .nounmount = 1,
+            .forceunmount = 0,
+    };
+    if (zfs_rename(be_zh, new_be_ds, rnf) != 0) {
         ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                               "Rename of boot environment (%s) failed.\n", boot_environment);
         goto err;
@@ -2651,7 +2656,7 @@ libze_rename(libze_handle *lzeh, char const boot_environment[static 1],
 
     if (be_bpool_zh != NULL) {
         // No recurse, no create parents
-        if (zfs_rename(be_bpool_zh, new_be_bpool_ds, B_FALSE, B_FALSE) != 0) {
+        if (zfs_rename(be_bpool_zh, new_be_bpool_ds, rnf) != 0) {
             ret = libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                                   "Rename of boot environment (%s) on bootpool failed.\n",
                                   boot_environment);
