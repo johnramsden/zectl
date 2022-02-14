@@ -54,7 +54,7 @@ zectl is a ZFS Boot Environment manager for Linux.
 	_-F_ forcefully unmounts and destroys _boot-environment_.
 
 *zectl get* [ -H ] [ property ]
-	Get properties associated with _zectl_.
+	Get zfs properties associated with _zectl_.
 
 	_-H_ outputs tab delimited data and removes headers.
 
@@ -79,7 +79,7 @@ zectl is a ZFS Boot Environment manager for Linux.
 	active boot environments cannot be renamed.
 
 *zectl set* <property>=<value>
-	Set a property for _zectl_.
+	Set a zfs property for _zectl_.
 
 *zectl snapshot* <boot-environment>@<snapshot>
 	Snapshot _boot-environment_.
@@ -92,3 +92,8 @@ zectl is a ZFS Boot Environment manager for Linux.
 *zectl unmount* <boot-environment>
 	Unmount <boot-environment>. Currently booted boot environments cannot be
 	unmounted.
+
+# SEE ALSO
+
+zfsprops(7), zfs-set(8), zfs(8)
+
