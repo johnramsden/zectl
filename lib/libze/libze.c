@@ -1412,12 +1412,6 @@ libze_activate(libze_handle *lzeh, libze_activate_options *options) {
         goto err;
     }
 
-    // Set for all child datasets and promote
-    if (zfs_iter_filesystems(be_zh, libze_clone_cb, &cbd) != 0) {
-        ret = LIBZE_ERROR_UNKNOWN;
-        goto err;
-    }
-
     if (be_bpool_zh != NULL) {
         if (libze_activate_cb(be_bpool_zh, &cbd) != 0) {
             ret = libze_error_set(
@@ -1578,14 +1572,6 @@ libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suf
         // libze_clone_cb sets error message.
         ret = LIBZE_ERROR_UNKNOWN;
         goto err;
-    }
-
-    if (recursive) {
-        if (zfs_iter_filesystems(zroot_hdl, libze_clone_cb, &cbd) != 0) {
-            // libze_clone_cb sets error message.
-            ret = LIBZE_ERROR_UNKNOWN;
-            goto err;
-        }
     }
 
     nvpair_t *pair = NULL;
