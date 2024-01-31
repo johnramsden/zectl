@@ -20,6 +20,7 @@ endif()
 
 add_subdirectory(lib)
 add_subdirectory(src)
+add_subdirectory(docs)
 
 if (BUILD_TESTING)
     add_subdirectory(tests)
