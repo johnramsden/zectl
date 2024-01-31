@@ -1,14 +1,14 @@
 # Maintainer: John Ramsden <johnramsden [at] riseup [dot] net>
 
 pkgname=zectl
-pkgver=0.1.2
-pkgrel=1
+pkgver=0.1.3
+pkgrel=2
 pkgdesc="ZFS Boot Environment manager."
 url="http://github.com/johnramsden/${pkgname}"
 arch=('any')
 license=('MIT')
 depends=('zfs')
-makedepends=('make' 'cmake')
+makedepends=('make' 'cmake' 'scdoc')
 conflicts=("${pkgname}-git")
 provides=("zectl")
 

@@ -6,7 +6,8 @@ Build-Depends:
  debhelper-compat (= 12),
  cmake,
  libzfslinux-dev,
- pkgconf
+ pkgconf,
+ scdoc
 Standards-Version: 4.5.0
 Homepage: https://github.com/johnramsden/zectl
 
