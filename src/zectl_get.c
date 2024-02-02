@@ -49,7 +49,7 @@ print_properties(libze_handle *lzeh, nvlist_t *properties, get_options *options)
     for (pair = nvlist_next_nvpair(properties, NULL); pair != NULL;
          pair = nvlist_next_nvpair(properties, pair)) {
         nvpair_value_nvlist(pair, &prop);
-        char *string_prop;
+        const char *string_prop;
         printf("%-*s%s", (int) widths.property, nvpair_name(pair), tab_suffix);
         if (nvlist_lookup_string(prop, "value", &string_prop) == 0) {
             printf("%-*s%s", (int) widths.value, string_prop, tab_suffix);
