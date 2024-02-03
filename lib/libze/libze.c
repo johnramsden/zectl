@@ -467,7 +467,7 @@ libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop, char const *
     for (pair = nvlist_next_nvpair(default_prop, NULL); pair != NULL;
          pair = nvlist_next_nvpair(default_prop, pair)) {
 
-        char *nvp_name = nvpair_name(pair);
+        const char *nvp_name = nvpair_name(pair);
         char buf[ZFS_MAXPROPLEN];
 
         if (libze_util_cut(nvp_name, ZFS_MAXPROPLEN, buf, ':') != 0) {
@@ -483,7 +483,7 @@ libze_default_props_set(libze_handle *lzeh, nvlist_t *default_prop, char const *
         nvpair_t *ze_pair = NULL;
         for (ze_pair = nvlist_next_nvpair(lzeh->ze_props, NULL); ze_pair != NULL;
              ze_pair = nvlist_next_nvpair(lzeh->ze_props, ze_pair)) {
-            char *ze_nvp_name = nvpair_name(ze_pair);
+            const char *ze_nvp_name = nvpair_name(ze_pair);
             if (strcmp(ze_nvp_name, nvp_name) == 0) {
                 ze_prop_unset = B_FALSE;
                 break;
@@ -531,7 +531,7 @@ libze_filter_be_props(nvlist_t *unfiltered_nvl, nvlist_t **result_nvl,
 
     for (pair = nvlist_next_nvpair(unfiltered_nvl, NULL); pair != NULL;
          pair = nvlist_next_nvpair(unfiltered_nvl, pair)) {
-        char *nvp_name = nvpair_name(pair);
+        const char *nvp_name = nvpair_name(pair);
         char buf[ZFS_MAXPROPLEN];
 
         // Make sure namespace ends
@@ -592,7 +592,7 @@ libze_nvlist_prop_get(libze_handle *lzeh, nvlist_t *props, char *result_prop, ch
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN, "Property nvlist set incorrectly.\n");
     }
 
-    char *string_prop = NULL;
+    const char *string_prop = NULL;
     if (nvpair_value_string(prop, &string_prop) != 0) {
         return libze_error_set(lzeh, LIBZE_ERROR_UNKNOWN,
                                "Property nvlist value is wrong type. Should be a string.\n");
@@ -1581,7 +1581,7 @@ libze_clone(libze_handle *lzeh, char source_root[static 1], char source_snap_suf
         nvpair_value_nvlist(pair, &ds_props);
 
         // Recursive clone
-        char *ds_name = nvpair_name(pair);
+        const char *ds_name = nvpair_name(pair);
         char ds_snap_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
         char be_child_buf[ZFS_MAX_DATASET_NAME_LEN] = "";
         char ds_child_buf[ZFS_MAX_DATASET_NAME_LEN] = "";

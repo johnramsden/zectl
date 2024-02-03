@@ -14,7 +14,7 @@ set_column_width(size_t *width_column, char const *string_prop) {
 
 int
 set_column_width_lookup(nvlist_t *be_props, size_t *width_column, char *property) {
-    char *string_prop;
+    const char *string_prop;
     if (nvlist_lookup_string(be_props, property, &string_prop) != 0) {
         return -1;
     }
