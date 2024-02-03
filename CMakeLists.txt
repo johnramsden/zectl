@@ -12,17 +12,12 @@ include(FindZFS)
 
 if (CMAKE_VERSION VERSION_LESS 3.12)
     add_definitions(-DDEBUG=0)
-    add_definitions(-DBUILD_TESTING=0)
 else()
     add_compile_definitions(DEBUG=0)
-    add_compile_definitions(BUILD_TESTING=0)
 endif()
 
 add_subdirectory(lib)
 add_subdirectory(src)
-
-if (BUILD_TESTING)
-    add_subdirectory(tests)
-endif()
+add_subdirectory(tests)
 
 unset(PLUGINS_DIRECTORY CACHE)
