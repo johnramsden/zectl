@@ -18,6 +18,7 @@ endif()
 
 add_subdirectory(lib)
 add_subdirectory(src)
+add_subdirectory(docs)
 add_subdirectory(tests)
 
 unset(PLUGINS_DIRECTORY CACHE)
