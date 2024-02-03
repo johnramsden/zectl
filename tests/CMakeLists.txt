@@ -1,18 +1,22 @@
-enable_testing()
-find_package(Check REQUIRED)
+option(BUILD_TESTING "Create all tests" NO)
 
-# Needed for ubuntu - see https://github.com/libcheck/check/issues/48
-find_package(Threads REQUIRED)
+if (BUILD_TESTING)
+    enable_testing()
+    find_package(Check REQUIRED)
 
-include_directories(${CHECK_INCLUDE_DIRS})
+    # Needed for ubuntu - see https://github.com/libcheck/check/issues/48
+    find_package(Threads REQUIRED)
 
-set(LIBS ${LIBS} ${CHECK_LIBRARIES}
-        ${ZE_LINK_LIBRARIES}
-        ${CMAKE_THREAD_LIBS_INIT}
-        libze util)
+    include_directories(${CHECK_INCLUDE_DIRS})
 
-include_directories(. ../include)
+    set(LIBS ${LIBS} ${CHECK_LIBRARIES}
+         ${ZE_LINK_LIBRARIES}
+         ${CMAKE_THREAD_LIBS_INIT}
+         libze util)
 
-add_executable(zectl_tests zectl_tests.c zectl_tests.h)
-target_link_libraries(zectl_tests ${LIBS})
-add_test(zectl_tests ${CMAKE_CURRENT_BINARY_DIR}/zectl_tests)
+    include_directories(. ../include)
+
+    add_executable(zectl_tests zectl_tests.c zectl_tests.h)
+    target_link_libraries(zectl_tests ${LIBS})
+    add_test(zectl_tests ${CMAKE_CURRENT_BINARY_DIR}/zectl_tests)
+endif()

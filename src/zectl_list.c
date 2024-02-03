@@ -65,7 +65,7 @@ static void
 print_bes(nvlist_t **bootenvs, list_options_t *options) {
     nvpair_t *pair;
     nvlist_t *be_props;
-    char *string_prop;
+    const char *string_prop;
     char *tab_suffix = "\t";
 
     list_value_widths_t widths = {0};
