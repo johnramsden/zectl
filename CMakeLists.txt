@@ -6,6 +6,35 @@ set (CMAKE_C_STANDARD 11)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMakeModules/")
 
+# Test these when checking for bugs
+#add_compile_options(
+#        -O2
+#        -pipe
+#        -fno-plt
+#        -fexceptions
+#        -Wp,-D_FORTIFY_SOURCE=3
+#        -Wformat
+#        -Werror=format-security
+#        -fstack-clash-protection
+#        -fcf-protection
+#        -fno-omit-frame-pointer
+#        -mno-omit-leaf-frame-pointer
+#)
+#
+#add_link_options(
+#        -O2
+#        -pipe
+#        -fno-plt
+#        -fexceptions
+#        -Wp,-D_FORTIFY_SOURCE=3
+#        -Wformat
+#        -Werror=format-security
+#        -fstack-clash-protection
+#        -fcf-protection
+#        -fno-omit-frame-pointer
+#        -mno-omit-leaf-frame-pointer
+#)
+
 include_directories(include)
 
 include(FindZFS)

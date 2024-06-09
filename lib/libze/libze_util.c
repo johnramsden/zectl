@@ -418,7 +418,8 @@ recursive_traverse(char const directory_path[LIBZE_MAX_PATH_LEN], traverse_cb cb
     }
 
     /* Move the fin to end of string */
-    fin += strlen(directory_path);
+    int prefix_len = strlen(directory_path);
+    fin += prefix_len;
 
     while ((de = readdir(directory)) != NULL) {
 
@@ -432,7 +433,7 @@ recursive_traverse(char const directory_path[LIBZE_MAX_PATH_LEN], traverse_cb cb
         }
 
         /* Append file to path */
-        if (strlcpy(fin, buf, LIBZE_MAX_PATH_LEN) >= LIBZE_MAX_PATH_LEN) {
+        if (strlcpy(fin, buf, LIBZE_MAX_PATH_LEN-prefix_len) >= LIBZE_MAX_PATH_LEN-prefix_len) {
             ret = ENAMETOOLONG;
             goto done;
         }
