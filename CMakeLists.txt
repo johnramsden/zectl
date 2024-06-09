@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(zectl LANGUAGES C VERSION 0.1.4 DESCRIPTION "BE Manager")
+project(zectl LANGUAGES C VERSION 0.1.5 DESCRIPTION "BE Manager")
 
 set (CMAKE_C_STANDARD 11)
 
