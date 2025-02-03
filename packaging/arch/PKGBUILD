@@ -1,7 +1,7 @@
 # Maintainer: John Ramsden <johnramsden [at] riseup [dot] net>
 
 pkgname=zectl
-pkgver=0.1.5
+pkgver=0.1.6
 pkgrel=1
 pkgdesc="ZFS Boot Environment manager."
 url="http://github.com/johnramsden/${pkgname}"
