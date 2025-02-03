@@ -1872,6 +1872,15 @@ libze_create(libze_handle *lzeh, libze_create_options *options) {
     create_data cdata;
     create_data boot_pool_cdata;
 
+    /* Validate new boot environment */
+    char new_ds_chk[ZFS_MAX_DATASET_NAME_LEN] = "";
+    char new_bpool_ds_chk[ZFS_MAX_DATASET_NAME_LEN] = "";
+    if (validate_new_be(lzeh, options->be_name, new_ds_chk, new_bpool_ds_chk) != LIBZE_ERROR_SUCCESS) {
+        return libze_error_prepend(lzeh, lzeh->libze_error,
+                                   "Failed to validate new boot environment (%s)!\n",
+                                   options->be_name);
+    }
+
     /* Populate cdata from existing dataset or snap */
     if (options->existing) {
         ret = prepare_create_from_existing(lzeh, options->be_source, &cdata);
